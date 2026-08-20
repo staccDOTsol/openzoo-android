@@ -149,7 +149,10 @@ check("dark launch loader stays up until chrome-ready, not models or Play", () =
   assert.match(shell, /#oz-boot\s*\{[^}]*background:\s*#0a0a18/);
   assert.match(shell, /starting<span class="oz-dot">\.<\/span>/);
   assert.match(shell, /text-transform:\s*lowercase/);
-  assert.doesNotMatch(shell, /id="oz-boot"[^>]*>[\s\S]*?<img/);
+  const bootOpen = shell.indexOf('<div id="oz-boot"');
+  const bootClose = shell.indexOf("</div>", bootOpen);
+  assert.ok(bootOpen !== -1 && bootClose !== -1);
+  assert.doesNotMatch(shell.slice(bootOpen, bootClose), /<img|logo|splash/i);
   assert.doesNotMatch(shell, /cordova-plugin-splashscreen|cdv-splashscreen|navigator\.splashscreen/i);
   assert.match(cfg, /AutoHideSplashScreen"\s+value="true"/);
   assert.match(shell, /function launchApp\(\) \{\s*showBoot\(\);/);
