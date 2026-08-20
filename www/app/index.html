@@ -86,11 +86,11 @@
   #send svg { width: 16px; height: 16px; }
   #menuBtn { display: none; }
   #scrim { display: none; }
-  #walletOverlay, #pasteOverlay, #fundsOverlay, #settingsOverlay {
+  #walletOverlay, #pasteOverlay, #fundsOverlay, #settingsOverlay, #wrapOverlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.66); z-index: 80;
     display: none; align-items: flex-end; justify-content: center;
   }
-  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show, #settingsOverlay.show { display: flex; }
+  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show, #settingsOverlay.show, #wrapOverlay.show { display: flex; }
   .sheet { width: 100%; max-width: 560px; max-height: 82vh; overflow-y: auto; background: #111113;
            border: 1px solid #2c2c2e; border-radius: 16px 16px 0 0; padding: 20px 18px 24px; }
   .sheet h3 { margin: 0 0 6px; font-size: 15px; }
@@ -151,6 +151,7 @@
       <div id="headerDials">
         <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
         <datalist id="modelList"></datalist>
+        <button class="dial" id="headerNewBtn" type="button">New chat</button>
         <button class="dial" id="settingsBtn" type="button">settings</button>
       </div>
     </div>
@@ -228,8 +229,24 @@
     <div class="sheet">
       <h3 id="fundsTitle">Need funds in Phantom</h3>
       <p class="tiny" id="fundsBody"></p>
+      <p class="tiny" id="fundsWhich"></p>
+      <div class="wrow">
+        <div class="wlab">Your address</div>
+        <div id="fundsAddr" class="waddr" data-copy-kind="phantom">not connected</div>
+      </div>
       <div class="actions">
         <button class="ghost" id="fundsClose" type="button">close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="wrapOverlay">
+    <div class="sheet">
+      <h3 id="wrapTitle">Wrap TOKEN to send this?</h3>
+      <p class="tiny" id="wrapBody">Phantom will wrap a little TOKEN so this message can send.</p>
+      <div class="actions">
+        <button class="sendish" id="wrapOk" type="button">Wrap TOKEN</button>
+        <button class="ghost" id="wrapCancel" type="button">cancel</button>
       </div>
     </div>
   </div>

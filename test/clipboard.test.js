@@ -64,6 +64,8 @@ function load(rel) {
   assert.match(pay, /savePending402/);
   assert.match(pay, /PaymentPausedError/);
   assert.match(pay, /app-resume/);
+  assert.match(pay, /confirmWrap/);
+  assert.match(load("www/app/index.html"), /Wrap TOKEN to send this\?/);
   const shell = load("www/index.html");
   assert.match(shell, /notifyApp\('app-resume'\)/);
   console.log("ok 402 persists across resume");
