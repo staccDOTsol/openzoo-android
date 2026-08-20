@@ -42,9 +42,24 @@
     #status { margin-top: 14px; font-size: 12px; color: #8e8e93; text-align: center; max-width: 360px; min-height: 18px; }
     .powered { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 14px;
                font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.35); }
+    #oz-boot {
+      position: fixed; inset: 0; z-index: 10000;
+      background: #0a0a18;
+      display: flex; align-items: center; justify-content: center;
+      color: #8e8e93; font-size: 14px; letter-spacing: .04em;
+      text-transform: lowercase; pointer-events: auto;
+    }
+    #oz-boot[hidden] { display: none !important; }
+    #oz-boot .oz-dot {
+      display: inline-block; animation: oz-boot-dot 1.2s infinite ease-in-out; opacity: .2;
+    }
+    #oz-boot .oz-dot:nth-of-type(2) { animation-delay: .2s; }
+    #oz-boot .oz-dot:nth-of-type(3) { animation-delay: .4s; }
+    @keyframes oz-boot-dot { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
   </style>
 </head>
 <body>
+  <div id="oz-boot" aria-live="polite">starting<span class="oz-dot">.</span><span class="oz-dot">.</span><span class="oz-dot">.</span></div>
   <div class="logo"><img src="img/token.jpg" alt="OpenZoo"></div>
   <div class="tag" id="tagline">Subscription keys · no x402</div>
   <div class="title">openzoo</div>
@@ -92,11 +107,39 @@
   var $status = document.getElementById('status');
   var $restore = document.getElementById('restore');
   var $tag = document.getElementById('tagline');
+  var bootHideTimer = null;
+  var bootDismissed = false;
 
   function log(msg) { console.log('[play-shell] ' + msg); }
   function setStatus(msg) { $status.textContent = msg || ''; }
 
+  function showBoot() {
+    var el = document.getElementById('oz-boot');
+    if (!el) return;
+    bootDismissed = false;
+    el.removeAttribute('hidden');
+  }
+
+  function hideBoot() {
+    var el = document.getElementById('oz-boot');
+    if (el) el.setAttribute('hidden', '');
+  }
+
+  function dismissBoot() {
+    if (bootDismissed) return;
+    bootDismissed = true;
+    if (bootHideTimer) {
+      clearTimeout(bootHideTimer);
+      bootHideTimer = null;
+    }
+    hideBoot();
+  }
+
   function launchApp() {
+    showBoot();
+    if (bootHideTimer) clearTimeout(bootHideTimer);
+    bootHideTimer = setTimeout(dismissBoot, 4000);
+
     var old = document.getElementById('game');
     if (old) old.remove();
     document.querySelector('.logo').style.display = 'none';
@@ -128,12 +171,14 @@
     iframe.addEventListener('load', function onLoad() {
       iframe.removeEventListener('load', onLoad);
       setTimeout(sendReady, 300);
+      setTimeout(dismissBoot, 50);
     });
     iframe.src = GAME_URL;
     log('Loading grokui iframe after Play entitlement');
   }
 
   function showPaywall() {
+    hideBoot();
     document.querySelector('.logo').style.display = '';
     document.querySelector('.title').style.display = '';
     document.querySelector('.sub').style.display = '';
@@ -310,6 +355,11 @@
     var data = event.data;
     if (!data || !data.type) return;
 
+    if (data.type === 'openzoo-chrome-ready') {
+      dismissBoot();
+      return;
+    }
+
     if (data.type === 'billing-sign-out') {
       persistBilling({});
       showPaywall();
@@ -383,6 +433,11 @@
       });
     });
   }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // First-run: paywall is the first UI. Entitled skip-picker keeps #oz-boot up.
+    if (!B.hasEntitlement(billingState)) hideBoot();
+  });
 
   document.addEventListener('deviceready', function () {
     log('deviceready');
