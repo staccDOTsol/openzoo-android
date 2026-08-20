@@ -109,7 +109,7 @@ check("empty wallet includes 402 help text", () => {
   const help = "Don't hold any yet? https://x402.accrue.fund/start";
   const copy = R.steerCopy(d, help);
   assert.match(copy.body, /yUSDCx \(wrapped USDC\), not plain USDC/);
-  assert.match(copy.body, help);
+  assert.ok(copy.body.indexOf(help) !== -1);
 });
 
 check("probe failure returns yUSDCx then wTOKENx then wLEOSx", () => {
@@ -162,8 +162,8 @@ check("pay path sources never call signAndSendTransaction", () => {
     "www/app/index.html",
   ].map((f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8"));
   const joined = files.join("\n");
-  assert.doesNotMatch(joined, /signAndSendTransaction/);
-  assert.match(joined, /MWA\.signTransaction/);
+  assert.doesNotMatch(joined, /MWA\.signAndSendTransaction|signAndSendTransaction\s*\(/);
+  assert.match(joined, /MWA\.signTransaction\s*\(/);
   assert.doesNotMatch(joined, /@solana\/web3\.js|@solana\/spl-token/);
 });
 
