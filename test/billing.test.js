@@ -78,10 +78,14 @@ function tier(id) {
   assert.ok(html.includes("js/billing.js"));
   assert.ok(html.includes("Restore purchases"));
   assert.ok(html.includes("Google Play"));
+  assert.ok(html.includes("mountDevField"));
+  assert.ok(html.includes("playUnlockStatus"));
+  assert.ok(html.includes("placeholder = 'dev'"));
   assert.ok(!html.includes("CONNECT PHANTOM"));
   assert.ok(!html.includes("checkout.stripe.com"));
   assert.ok(!html.includes("/api/billing/checkout"));
   assert.ok(!html.includes("InAppBrowser"));
+  assert.ok(!html.includes("jarettrsdunn1999@gmail.com"));
   console.log("ok paywall leads with Play Billing");
 })();
 

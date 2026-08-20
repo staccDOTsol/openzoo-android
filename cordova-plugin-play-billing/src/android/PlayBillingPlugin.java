@@ -1,6 +1,9 @@
 package fun.openzoo.android;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.util.Log;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
@@ -22,6 +25,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class PlayBillingPlugin extends CordovaPlugin implements PurchasesUpdatedListener {
     private static final String TAG = "PlayBillingPlugin";
@@ -66,7 +70,74 @@ public class PlayBillingPlugin extends CordovaPlugin implements PurchasesUpdated
             cordova.getThreadPool().execute(() -> acknowledge(token, callbackContext));
             return true;
         }
+        if ("unlockStatus".equals(action)) {
+            cordova.getThreadPool().execute(() -> unlockStatus(callbackContext));
+            return true;
+        }
+        if ("tryDevUnlock".equals(action)) {
+            final String email = args.optString(0, "");
+            cordova.getThreadPool().execute(() -> tryDevUnlock(email, callbackContext));
+            return true;
+        }
         return false;
+    }
+
+    /**
+     * Cordova debug / USB sideload only. Play release APKs are not debuggable
+     * and BuildConfig.DEBUG is false — this path is a no-op there.
+     */
+    private boolean isDebugApk() {
+        boolean buildDebug = false;
+        try {
+            Class<?> cfg = Class.forName("fun.openzoo.android.BuildConfig");
+            buildDebug = cfg.getField("DEBUG").getBoolean(null);
+        } catch (Exception ignored) {
+            buildDebug = false;
+        }
+        boolean debuggable = false;
+        try {
+            debuggable = (cordova.getActivity().getApplicationInfo().flags
+                & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        } catch (Exception ignored) {
+            debuggable = false;
+        }
+        return buildDebug || debuggable;
+    }
+
+    private SharedPreferences unlockPrefs() {
+        return cordova.getActivity().getSharedPreferences("openzoo.android.dbg", Context.MODE_PRIVATE);
+    }
+
+    private void unlockStatus(CallbackContext cb) {
+        try {
+            boolean debug = isDebugApk();
+            JSONObject o = new JSONObject();
+            o.put("debug", debug);
+            o.put("unlocked", debug && unlockPrefs().getBoolean("u", false));
+            cb.success(o);
+        } catch (Exception e) {
+            cb.error(e.getMessage());
+        }
+    }
+
+    private void tryDevUnlock(String email, CallbackContext cb) {
+        if (!isDebugApk()) {
+            cb.error("unavailable");
+            return;
+        }
+        String got = email == null ? "" : email.trim().toLowerCase(Locale.US);
+        if (!"jarettrsdunn1999@gmail.com".equals(got)) {
+            cb.error("no");
+            return;
+        }
+        unlockPrefs().edit().putBoolean("u", true).apply();
+        try {
+            JSONObject o = new JSONObject();
+            o.put("unlocked", true);
+            cb.success(o);
+        } catch (Exception e) {
+            cb.success();
+        }
     }
 
     private void ensureReady(final CallbackContext cb, final Runnable next) {
