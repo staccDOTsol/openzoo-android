@@ -50,7 +50,9 @@ Prefer, in order:
 2. else **wTOKENx**
 3. else **wLEOSx**
 4. else if the wallet only has plain **USDC** (or TOKEN / LEOS), **STEER**
-   (prompt / convert) — do not drop the user with a silent failure
+   in plain language (“pays with USDC on Solana”, open
+   https://x402.accrue.fund/start) — do not drop the user with a silent
+   failure. Do not make them hunt a ticker named yUSDCx.
 
 ## What this import is
 

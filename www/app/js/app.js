@@ -7,7 +7,7 @@
   var SKEY = "openzoo.android.session.v1";
 
   var state = Object.assign(
-    { messages: [], ctx: null, spent: 0, saved: 0, calls: 0, model: "", topK: "" },
+    { messages: [], ctx: null, corpus: "", spent: 0, saved: 0, calls: 0, model: "", topK: "" },
     JSON.parse(localStorage.getItem(SKEY) || "{}"),
     { busy: false }
   );
@@ -16,6 +16,7 @@
     localStorage.setItem(SKEY, JSON.stringify({
       messages: state.messages,
       ctx: state.ctx,
+      corpus: state.corpus,
       spent: state.spent,
       saved: state.saved,
       calls: state.calls,
@@ -37,7 +38,7 @@
   }
 
   function showSteer(copy) {
-    $("steerTitle").textContent = (copy && copy.title) || "Need a payable token";
+    $("steerTitle").textContent = (copy && copy.title) || "Need USDC on Solana";
     $("steerBody").textContent = (copy && copy.body) || "";
     $("steer").classList.add("open");
   }
@@ -90,7 +91,7 @@
 
   function loadModels() {
     return fetch(R.GATEWAY + "/v1/models", {
-      headers: { authorization: "Bearer openzoo" },
+      headers: R.gatewayHeaders(),
     }).then(function (r) { return r.json(); }).then(function (d) {
       var models = (d.data || []).filter(function (m) {
         return m.id && m.id.charAt(0) !== "~" && m.id.indexOf(":batch") === -1;
@@ -117,8 +118,13 @@
   function renderStats(d) {
     var today = d.today || {};
     var lines = [];
+    if (d.app) lines.push(String(d.app));
     lines.push("Today (" + (today.day || "?") + "): " + (today.calls || 0) + " calls · " +
       (today.paid || 0) + " paid · $" + Number(today.usdPaid || 0).toFixed(2));
+    if (Array.isArray(d.days) && d.days.length) {
+      lines.push(d.days.length + " daily row" + (d.days.length === 1 ? "" : "s") +
+        " since " + ((d.coverage && d.coverage.since) || d.days[0].day || "?"));
+    }
     if (d.growth && d.growth.trailing7) {
       lines.push("Trailing 7 days: " + d.growth.trailing7.calls + " calls · $" +
         Number(d.growth.trailing7.usdPaid || 0).toFixed(2));
@@ -127,19 +133,21 @@
       return (m.model || "?") + " (" + m.calls + ")";
     });
     if (tops.length) lines.push("Top models: " + tops.join(", "));
+    if (d.coverage && d.coverage.caveat) lines.push(d.coverage.caveat);
     $("statsBody").textContent = lines.join("\n\n");
   }
 
   function loadStats() {
     $("statsBody").textContent = "loading…";
-    return fetch(R.GATEWAY + "/v1/stats").then(function (r) { return r.json(); }).then(renderStats)
+    return fetch(R.GATEWAY + "/v1/stats", { headers: R.gatewayHeaders() })
+      .then(function (r) { return r.json(); }).then(renderStats)
       .catch(function (e) { $("statsBody").textContent = "Could not load stats: " + e.message; });
   }
 
   function handlePayError(e, thinking) {
     if (e && e.name === "SteerError") {
       showSteer(e.copy);
-      if (thinking) thinking.textContent = "Payment needs a wrapped token — see the wrap panel.";
+      if (thinking) thinking.textContent = "Need USDC on Solana — see the wrap panel.";
       return;
     }
     if (thinking) thinking.textContent = "the zoo hiccuped: " + ((e && e.message) || e);
@@ -159,7 +167,7 @@
     state.messages.push({ role: "user", content: text });
     var thinking = bubble("…", false);
 
-    var headers = { "content-type": "application/json" };
+    var headers = {};
     if (state.ctx) headers["x-hrr-context"] = state.ctx;
     if ($("topK").value) headers["x-hrr-top-k"] = $("topK").value;
 
@@ -170,10 +178,21 @@
       max_tokens: R.maxTokensFor(model),
     };
 
-    P.paidFetch("/v1/chat/completions", {
-      method: "POST",
-      headers: headers,
-      body: JSON.stringify(payload),
+    function runPaid() {
+      return P.paidFetch("/v1/chat/completions", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+    }
+
+    runPaid().catch(function (e) {
+      if (e && e.name !== "ContextNotFoundError") throw e;
+      return rebindFree().then(function () {
+        if (state.ctx) headers["x-hrr-context"] = state.ctx;
+        else delete headers["x-hrr-context"];
+        return runPaid();
+      });
     }).then(function (r) { return r.json(); }).then(function (d) {
       var ch = d.choices && d.choices[0];
       var content = (ch && ch.message && ch.message.content) || "";
@@ -212,27 +231,50 @@
     });
   }
 
+  function applyBind(d, corpus) {
+    if (!d || !d.context_id) return false;
+    state.ctx = d.context_id;
+    if (corpus) state.corpus = corpus;
+    $("bindStatus").textContent = "bound " + ((corpus || "").length / 1000).toFixed(0) + "k chars";
+    var chip = $("ctxChip");
+    chip.style.display = "";
+    chip.classList.add("on");
+    chip.textContent = "bound " + d.context_id.slice(0, 10) + "…";
+    persist();
+    return true;
+  }
+
+  function postBind(corpus, contextId) {
+    return fetch(R.GATEWAY + "/v1/hrr/bind", {
+      method: "POST",
+      headers: R.gatewayHeaders(),
+      body: JSON.stringify(R.bindPayload(corpus, contextId)),
+    }).then(function (r) { return r.json(); });
+  }
+
+  function rebindFree() {
+    var corpus = state.corpus || ($("corpus") && $("corpus").value) || "";
+    if (!corpus.trim()) {
+      state.ctx = null;
+      persist();
+      return Promise.resolve(null);
+    }
+    return postBind(corpus, state.ctx).then(function (d) {
+      if (!applyBind(d, corpus)) {
+        state.ctx = null;
+        persist();
+      }
+      return d;
+    });
+  }
+
   function bind() {
     var corpus = $("corpus").value;
     if (!corpus.trim()) return;
     $("bindStatus").textContent = "binding…";
-    fetch(R.GATEWAY + "/v1/hrr/bind", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer openzoo" },
-      body: JSON.stringify({ corpus: corpus }),
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      if (d.context_id) {
-        state.ctx = d.context_id;
-        $("bindStatus").textContent = "bound " + (corpus.length / 1000).toFixed(0) + "k chars";
-        var chip = $("ctxChip");
-        chip.style.display = "";
-        chip.classList.add("on");
-        chip.textContent = "bound " + d.context_id.slice(0, 10) + "…";
-        $("drawer").classList.remove("open");
-        persist();
-      } else {
-        $("bindStatus").textContent = (d.error && d.error.message) || d.error || "bind failed";
-      }
+    postBind(corpus, null).then(function (d) {
+      if (applyBind(d, corpus)) $("drawer").classList.remove("open");
+      else $("bindStatus").textContent = (d.error && d.error.message) || d.error || "bind failed";
     }).catch(function (e) {
       $("bindStatus").textContent = e.message;
     });
@@ -247,6 +289,7 @@
     if (state.calls) $("calls").textContent = state.calls + (state.calls === 1 ? " call" : " calls");
     if (state.model) $("model").value = state.model;
     if (state.topK) $("topK").value = state.topK;
+    if (state.corpus && $("corpus") && !$("corpus").value) $("corpus").value = state.corpus;
     if (state.ctx) {
       var chip = $("ctxChip");
       chip.style.display = "";

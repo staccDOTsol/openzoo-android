@@ -43,33 +43,37 @@ webview.
 1. `POST https://x402-tokens.fly.dev/v1/chat/completions` → **402**
 2. Pick a payable **Solana** `accepts[]` row (ignore `eip155` on Android)
 3. Probe balances with JSON-RPC `getTokenAccountsByOwner` (no web3.js)
-4. Prefer **yUSDCx** if raw balance ≥ `maxAmountRequired`, else **wTOKENx**,
-   else **wLEOSx**
+4. Prefer the live Solana `accepts[]` row (by `extra.symbol`) in order
+   yUSDCx → wTOKENx → wLEOSx. Probe that row's `asset` mint. Plain USDC
+   (`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) is never an `accepts[]`
+   row; `/v1/pay/build` does not wrap.
 5. `POST /v1/pay/build` `{ accept, payer }` → unsigned tx + envelope
 6. Shell: **`MWA.signTransaction(txB64)` only**
 7. Retry the completion with
    `X-PAYMENT: base64({ ...envelope, payload: { transaction: "<signed>" } })`
 
-Payment is the auth — any `Authorization` string is accepted.
+Payment is the auth — any `Authorization` string is accepted. Requests also
+send `x-openzoo-namespace: stacc` (unsigned soft-launch).
 
-These Solana rails are NAV-wrapped Token-2022 twins. A wallet that only holds
-plain USDC (`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) cannot pay. The app
-**steers** instead of retrying into a silent simulation failure:
+A wallet that only holds regular USDC cannot pay. The app **steers** instead
+of retrying into a silent simulation failure:
 
-> This app pays in yUSDCx (wrapped USDC), not plain USDC. Wrap at
-> https://x402.accrue.fund/start then come back.
+> This app pays with USDC on Solana. If your Phantom wallet only has regular
+> USDC, open https://x402.accrue.fund/start to wrap it, then come back.
 
-That URL opens in the system browser (`allow-intent` already allows `https`).
-There is **no on-device wrap** in v1.
+That URL opens in the system browser. There is **no on-device wrap** in v1.
 
-If the balance probe itself fails, the app tries yUSDCx → wTOKENx → wLEOSx and
-shows the same steer panel when settlement looks underfunded.
+If the balance probe itself fails, the app tries the live yUSDCx → wTOKENx →
+wLEOSx rows and shows the same steer panel when settlement looks underfunded.
 
 ## Bind + stats
 
-- Bind (free): `POST /v1/hrr/bind` `{ corpus }` → `{ context_id }`. Later chats
-  send `x-hrr-context` (optional `x-hrr-top-k`).
-- Stats: `GET /v1/stats` (public).
+- Bind (free): `POST /v1/hrr/bind` `{ corpus }` or
+  `{ items:[{ text }], context_id? }` → `{ context_id, bound }`. Later chats
+  send `x-hrr-context` (optional `x-hrr-top-k`). A chat `404` with
+  `error.code = context_not_found` re-binds for free **before** paying.
+- Stats: `GET /v1/stats` only (`app`, `today`, `days[]`, `growth`,
+  `topModels[]`, `coverage`). Do not call `/v1/session` or anything on `:8402`.
 - Models: `GET /v1/models`. Default is `google/gemini-3.7-flash` when present.
   Do not use a fake `openzoo` model id.
 
@@ -105,8 +109,9 @@ On device:
 2. Send a completion — Phantom should prompt to **sign** (not send) a tx
 3. Bind a short corpus and ask a question against it
 4. Open stats
-5. With a USDC-only wallet (no yUSDCx), confirm the wrap steer panel — not a
-   raw RPC / simulation error
+5. With a USDC-only wallet, confirm the wrap steer panel (plain “USDC on
+   Solana” copy, wrap page in the system browser) — not a raw RPC / simulation
+   error
 
 ## Release builds
 

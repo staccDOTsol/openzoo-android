@@ -45,8 +45,23 @@ async function main() {
   const challenge = await chat.json();
   const sol = (challenge.accepts || []).filter((a) => String(a.network || "").startsWith("solana:"));
   const symbols = sol.map((a) => a.extra && a.extra.symbol).sort();
-  for (const need of ["yUSDCx", "wTOKENx", "wLEOSx"]) {
+  const wantMint = {
+    yUSDCx: "6ZjjxcoicqM4nniddkuPVwew4PDwY3swbfHsGbCuLuTv",
+    wTOKENx: "FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B",
+    wLEOSx: "3FViQRMqtG6dUDFxZyyVvpM9xTHsKdX7uqZ5jvL8NZ35",
+  };
+  for (const need of Object.keys(wantMint)) {
     if (!symbols.includes(need)) throw new Error("402 missing Solana rail " + need + ": " + symbols);
+    const row = sol.find((a) => a.extra && a.extra.symbol === need);
+    if (row.asset !== wantMint[need]) {
+      throw new Error(need + " mint drifted: " + row.asset);
+    }
+    if (row.asset === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") {
+      throw new Error("plain USDC must not be an accepts row");
+    }
+  }
+  if (sol.some((a) => String(a.asset || "").indexOf("Bo7xBF7") === 0)) {
+    throw new Error("stale wTOKENx mint Bo7xBF7… appeared in live 402");
   }
   if (sol.some((a) => a.network.indexOf("eip155") !== -1)) {
     throw new Error("solana filter leaked an eip155 row");

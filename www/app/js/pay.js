@@ -111,6 +111,13 @@
     });
   }
 
+  function ContextNotFoundError() {
+    this.name = "ContextNotFoundError";
+    this.message = "context_not_found";
+  }
+  ContextNotFoundError.prototype = Object.create(Error.prototype);
+  ContextNotFoundError.prototype.constructor = ContextNotFoundError;
+
   function mintRawBalance(owner, mint) {
     return rpc("getTokenAccountsByOwner", [
       owner,
@@ -129,10 +136,19 @@
     });
   }
 
-  function probeBalances(owner) {
+  function probeBalances(owner, accepts) {
     var payable = {};
     var underlying = {};
-    var payableJobs = R.PAYABLE.map(function (p) {
+    var specs = [];
+    var seen = {};
+    R.PAYABLE.forEach(function (p) {
+      var live = accepts ? R.findPayableRow(accepts, p.symbol) : null;
+      var mint = (live && live.asset) || p.mint;
+      if (mint === R.PLAIN_USDC || seen[p.symbol]) return;
+      seen[p.symbol] = true;
+      specs.push({ symbol: p.symbol, mint: mint });
+    });
+    var payableJobs = specs.map(function (p) {
       return mintRawBalance(owner, p.mint).then(function (v) {
         payable[p.symbol] = v;
       });
@@ -192,10 +208,7 @@
   function buildPayment(accept, payer) {
     return fetch(R.GATEWAY + "/v1/pay/build", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer openzoo",
-      },
+      headers: R.gatewayHeaders(),
       body: JSON.stringify({ accept: accept, payer: payer }),
     }).then(function (res) {
       return readBody(res).then(function (body) {
@@ -222,7 +235,7 @@
   function paymentHeaderFor(challengeJson, payer) {
     var accepts = extractAccepts(challengeJson);
     var help = challengeJson && challengeJson.help;
-    return probeBalances(payer).then(function (balances) {
+    return probeBalances(payer, accepts).then(function (balances) {
       var decision = R.pickRail(accepts, balances);
       if (decision.mode === "steer") {
         throw new SteerError(R.steerCopy(decision, help));
@@ -263,16 +276,24 @@
     options = options || {};
     var payer = walletAddress;
     if (!payer) return Promise.reject(new Error("Connect a Phantom wallet first"));
-    var headers = Object.assign({
-      "content-type": "application/json",
-      authorization: "Bearer openzoo",
-    }, options.headers || {});
+    var headers = Object.assign(R.gatewayHeaders(), options.headers || {});
 
     return fetch(R.GATEWAY + path, {
       method: options.method || "GET",
       headers: headers,
       body: options.body,
     }).then(function (res) {
+      if (res.status === 404) {
+        return readBody(res).then(function (body) {
+          if (R.isContextNotFound(res.status, body.json)) {
+            throw new ContextNotFoundError();
+          }
+          var early = new Error(errText((body.json && (body.json.error || body.json.message)) || body.raw || "HTTP 404"));
+          early.status = 404;
+          early.body = body.json;
+          throw early;
+        });
+      }
       if (res.status !== 402) return res;
       return readBody(res).then(function (challenge) {
         return paymentHeaderFor(challenge.json || {}, payer).then(function (header) {
@@ -313,5 +334,6 @@
     probeBalances: probeBalances,
     paidFetch: paidFetch,
     SteerError: SteerError,
+    ContextNotFoundError: ContextNotFoundError,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -84,8 +84,9 @@ check("steers when only plain USDC is held", () => {
   assert.strictEqual(d.mode, "steer");
   assert.deepStrictEqual(d.heldUnderlying, ["USDC"]);
   const copy = R.steerCopy(d, "help text should stay off when they hold USDC");
-  assert.match(copy.body, /yUSDCx \(wrapped USDC\), not plain USDC/);
+  assert.match(copy.body, /pays with USDC on Solana/);
   assert.match(copy.body, /https:\/\/x402\.accrue\.fund\/start/);
+  assert.doesNotMatch(copy.body, /hunt|ticker named yUSDCx/i);
   assert.strictEqual(copy.help, "");
 });
 
@@ -96,7 +97,8 @@ check("steers TOKEN-only wallets", () => {
   });
   assert.strictEqual(d.mode, "steer");
   assert.ok(d.heldUnderlying.includes("TOKEN"));
-  assert.match(R.steerCopy(d).body, /wTOKENx/);
+  assert.match(R.steerCopy(d).body, /TOKEN/);
+  assert.match(R.steerCopy(d).body, /USDC on Solana/);
 });
 
 check("empty wallet includes 402 help text", () => {
@@ -108,8 +110,51 @@ check("empty wallet includes 402 help text", () => {
   assert.strictEqual(d.empty, true);
   const help = "Don't hold any yet? https://x402.accrue.fund/start";
   const copy = R.steerCopy(d, help);
-  assert.match(copy.body, /yUSDCx \(wrapped USDC\), not plain USDC/);
+  assert.match(copy.body, /pays with USDC on Solana/);
   assert.ok(copy.body.indexOf(help) !== -1);
+});
+
+check("prefers live accepts[] mint over a stale catalog mint", () => {
+  const liveTok = Object.assign({}, ACCEPTS.find((a) => a.extra.symbol === "wTOKENx"), {
+    asset: "LiveMint11111111111111111111111111111111",
+  });
+  const accepts = ACCEPTS.map((a) => a.extra && a.extra.symbol === "wTOKENx" ? liveTok : a);
+  const row = R.findPayableRow(accepts, "wTOKENx");
+  assert.strictEqual(row.asset, "LiveMint11111111111111111111111111111111");
+  const d = R.pickRail(accepts, {
+    payable: { yUSDCx: "0", wTOKENx: "33545783", wLEOSx: "0" },
+  });
+  assert.strictEqual(d.mode, "pay");
+  assert.strictEqual(d.accept.asset, "LiveMint11111111111111111111111111111111");
+});
+
+check("never treats plain USDC as a payable accept row", () => {
+  const withUsdc = ACCEPTS.concat([{
+    scheme: "exact",
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    asset: R.PLAIN_USDC,
+    maxAmountRequired: "1",
+    extra: { symbol: "USDC", decimals: 6 },
+  }]);
+  assert.ok(R.solanaAccepts(withUsdc).every((r) => r.asset !== R.PLAIN_USDC));
+  assert.strictEqual(R.findPayableRow(withUsdc, "USDC"), null);
+});
+
+check("bind payload and context_not_found helper", () => {
+  assert.deepStrictEqual(R.bindPayload("hello"), { corpus: "hello" });
+  assert.deepStrictEqual(R.bindPayload("hello", "ctx_1"), {
+    items: [{ text: "hello" }],
+    context_id: "ctx_1",
+  });
+  assert.ok(R.isContextNotFound(404, { error: { code: "context_not_found" } }));
+  assert.ok(!R.isContextNotFound(402, { error: { code: "context_not_found" } }));
+  assert.ok(!R.isContextNotFound(404, { error: { code: "nope" } }));
+});
+
+check("namespace header is unsigned stacc", () => {
+  const h = R.gatewayHeaders({ "x-hrr-context": "ctx" });
+  assert.strictEqual(h["x-openzoo-namespace"], "stacc");
+  assert.strictEqual(h["x-hrr-context"], "ctx");
 });
 
 check("probe failure returns yUSDCx then wTOKENx then wLEOSx", () => {
@@ -177,7 +222,7 @@ check("widget id is fun.openzoo.android and forbidden ids are gone", () => {
   assert.strictEqual(pkg.displayName, "OpenZoo");
   assert.doesNotMatch(cfg + shell, /fun\.openzoo\.seeker|fun\.openzoo\.psg1|com\.example\.cordovaseeker/);
   assert.doesNotMatch(shell, /:8402/);
-  assert.doesNotMatch(joinedApp(), /:8402/);
+  assert.doesNotMatch(joinedApp(), /:8402|\/v1\/session|Bo7xBF7/);
 });
 
 function joinedApp() {
