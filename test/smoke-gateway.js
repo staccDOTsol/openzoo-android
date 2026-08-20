@@ -29,6 +29,45 @@ async function main() {
   if (!bind.context_id) throw new Error("bind did not return context_id: " + JSON.stringify(bind));
   console.log("ok  bind (internal)");
 
+  const S = require("../www/app/js/spill.js");
+  const history = [];
+  for (let i = 1; i <= 12; i++) {
+    history.push({ role: "user", content: "android spill smoke ask " + i });
+    history.push({ role: "assistant", content: "android spill smoke ans " + i });
+  }
+  const prefix = S.prefixCorpus(
+    [{ role: "system", content: "sys" }].concat(history),
+    1,
+    history.length - 2,
+  );
+  const append = await (await fetch(GATEWAY + "/v1/hrr/bind", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ corpus: prefix, context_id: bind.context_id }),
+  })).json();
+  if (!append.context_id) throw new Error("transcript append lost context_id");
+  const req = S.chatRequest({
+    system: "sys",
+    messages: history,
+    model: "google/gemini-3.7-flash",
+    maxTokens: 16,
+    contextId: append.context_id,
+  });
+  if (!req.headers["x-hrr-context"]) throw new Error("spill request missing x-hrr-context");
+  if (req.sent >= req.total) throw new Error("spill still dumps the full thread: " + req.sent + "/" + req.total);
+  const body = JSON.stringify(req.payload);
+  if (body.length > 4000) throw new Error("spill body too large: " + body.length);
+  if (/android spill smoke ask 1\b/.test(body)) throw new Error("prefix leaked into chat POST");
+  const chat = await fetch(GATEWAY + "/v1/chat/completions", {
+    method: "POST",
+    headers: Object.assign({ "content-type": "application/json" }, req.headers),
+    body: body,
+  });
+  if (chat.status !== 402 && chat.status !== 200) {
+    throw new Error("spill chat POST unexpected HTTP " + chat.status);
+  }
+  console.log("ok  spill tail " + req.sent + "/" + req.total + " chars=" + body.length + " http=" + chat.status);
+
   const billingOrigin = "https://zoo.openzoo.fun";
   const tiers = await (await fetch(billingOrigin + "/api/billing/tiers")).json();
   if (!tiers.ok || !Array.isArray(tiers.tiers)) {
@@ -70,7 +109,7 @@ async function main() {
   }
   console.log("ok  POST /api/billing/play not a live mint (" + play.status + ") — Android stubs + TODO");
 
-  console.log("\n5 live gateway + billing checks passed");
+  console.log("\n6 live gateway + billing checks passed");
 }
 
 main().catch((e) => {

@@ -42,6 +42,12 @@
     return { corpus: corpus };
   }
 
+  /** Transcript prefix append — same shape as `npx openzoo claude` / grokui. */
+  function transcriptBindPayload(corpus, contextId) {
+    if (contextId) return { corpus: corpus, context_id: contextId };
+    return { corpus: corpus };
+  }
+
   function isContextNotFound(status, json) {
     var code = json && json.error && json.error.code;
     return Number(status) === 404 && code === "context_not_found";
@@ -88,6 +94,7 @@
     NAMESPACE: NAMESPACE,
     CONNECT_ORIGINS: CONNECT_ORIGINS,
     bindPayload: bindPayload,
+    transcriptBindPayload: transcriptBindPayload,
     isContextNotFound: isContextNotFound,
     gatewayHeaders: gatewayHeaders,
     looksNetworkGarbage: looksNetworkGarbage,

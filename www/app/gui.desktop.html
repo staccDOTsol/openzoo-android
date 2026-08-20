@@ -97,13 +97,13 @@ paste a huge corpus with 🧠 and ask questions against it for pennies: it never
 const $ = (id) => document.getElementById(id);
 const SKEY = "openzoo.session.v1";
 const state = Object.assign(
-  { messages: [], ctx: null, spent: 0, saved: 0, calls: 0, model: "" },
+  { messages: [], ctx: null, spent: 0, direct: 0, calls: 0, model: "" },
   JSON.parse(localStorage.getItem(SKEY) || "{}"),
   { busy: false },
 );
 function persist() {
-  const { messages, ctx, spent, saved, calls } = state;
-  localStorage.setItem(SKEY, JSON.stringify({ messages, ctx, spent, saved, calls, model: $("model")?.value || "" }));
+  const { messages, ctx, spent, direct, calls } = state;
+  localStorage.setItem(SKEY, JSON.stringify({ messages, ctx, spent, direct, calls, model: $("model")?.value || "" }));
 }
 
 const ANIMAL = (id) => id.startsWith("anthropic") ? "🦒" : id.startsWith("openai") ? "🦉"
@@ -194,14 +194,17 @@ async function send() {
     const x = d.x402 || {};
     state.calls += 1;
     if (typeof x.billedUsd === "number") state.spent += x.billedUsd;
-    if (typeof x.savesVsDirect === "number" && x.savesVsDirect > 0) state.saved += x.savesVsDirect;
+    if (typeof x.directUsd === "number") state.direct = (state.direct || 0) + x.directUsd;
     const bits = [];
     if (typeof x.billedUsd === "number") bits.push(`$${x.billedUsd.toFixed(4)}`);
     if (x.lecore?.engaged) bits.push(`🧠 ${x.lecore.recalled ?? "?"} slices`);
     if (bits.length) thinking.parentElement.querySelector("[data-role=bubble-meta]")?.remove(),
       thinking.insertAdjacentHTML("afterend", `<div class="meta" data-role="bubble-meta">${bits.join(" · ")}</div>`);
     $("spent").textContent = `this session: $${state.spent.toFixed(4)}`;
-    if (state.saved > 0) $("saved").textContent = `saved ~$${state.saved.toFixed(4)} vs direct 🎉`;
+    if (state.spent > 0 && state.direct > 0) {
+      const xSave = state.direct / state.spent;
+      $("saved").textContent = `${xSave >= 100 ? Math.round(xSave) : xSave.toFixed(1)}× vs direct`;
+    }
     $("calls").textContent = `${state.calls} call${state.calls === 1 ? "" : "s"}`;
     persist();
   } catch (e) {
@@ -238,7 +241,10 @@ async function bind() {
 function restore() {
   for (const m of state.messages) bubble(m.content, m.role === "user");
   $("spent").textContent = `this session: $${state.spent.toFixed(4)}`;
-  if (state.saved > 0) $("saved").textContent = `saved ~$${state.saved.toFixed(4)} vs direct 🎉`;
+  if (state.spent > 0 && (state.direct || 0) > 0) {
+    const xSave = state.direct / state.spent;
+    $("saved").textContent = `${xSave >= 100 ? Math.round(xSave) : xSave.toFixed(1)}× vs direct`;
+  }
   if (state.calls) $("calls").textContent = `${state.calls} call${state.calls === 1 ? "" : "s"}`;
   if (state.model) $("model").value = state.model;
   if (state.ctx) {

@@ -56,7 +56,9 @@ subscription API key that web Stripe checkout already mints via
 Do not call `POST /api/billing/checkout` from Android.
 
 Bind is **abstract**: the user attaches files, a folder, or pasted text.
-The UI never shows context ids, `/v1/bind`, or bind hashes.
+The UI never shows context ids, `/v1/bind`, or bind hashes. Chat history
+spills the same way: older turns bind once, later calls send a short tail
+plus the thread context id (never the growing thread plus that header).
 
 ## Plans (copy from live `/api/billing/tiers` — do not invent prices)
 

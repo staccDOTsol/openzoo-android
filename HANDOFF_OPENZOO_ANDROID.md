@@ -85,6 +85,7 @@ www/js/billing.js                   tiers, product IDs, Play token → key excha
 www/app/index.html                  grokui threads + composer + attach + Settings (plan)
 www/app/js/rails.js                 gateway + subscription Bearer key
 www/app/js/bind.js                  abstract attach → corpus
+www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
 cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
@@ -98,3 +99,8 @@ labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Chat / bind talk to `https://x402-tokens.fly.dev`. That hostname is the
 gateway, not an in-app x402 pay UI.
+
+Long threads use the same spill as `npx openzoo claude`: bind the transcript
+prefix to a per-thread context id, then POST system + last few turns with
+`x-hrr-context`. Never send that header together with the full messages
+array. HUD savings is `directUsd / spentUsd` — do not sum `savesVsDirect`.
