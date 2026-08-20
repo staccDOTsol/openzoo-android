@@ -1,0 +1,10 @@
+{
+  "name": "cordova-plugin-openzoo-clipboard",
+  "version": "1.0.0",
+  "description": "Android ClipboardManager for OpenZoo address copy",
+  "cordova": {
+    "id": "cordova-plugin-openzoo-clipboard",
+    "platforms": ["android"]
+  },
+  "license": "MIT"
+}

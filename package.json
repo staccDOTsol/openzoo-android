@@ -5,11 +5,12 @@
   "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone. Play Billing subscriptions first; Phantom/x402 is optional.",
   "main": "index.js",
   "scripts": {
-    "test": "node test/rails.test.js && node test/wrap.test.js && node test/bind.test.js && node test/billing.test.js && node test/smoke-gateway.js",
+    "test": "node test/rails.test.js && node test/wrap.test.js && node test/bind.test.js && node test/billing.test.js && node test/clipboard.test.js && node test/smoke-gateway.js",
     "test:rails": "node test/rails.test.js",
     "test:wrap": "node test/wrap.test.js",
     "test:bind": "node test/bind.test.js",
     "test:billing": "node test/billing.test.js",
+    "test:clipboard": "node test/clipboard.test.js",
     "test:gateway": "node test/smoke-gateway.js",
     "build": "cordova build android",
     "build:release": "cordova build android --release",
@@ -35,7 +36,8 @@
   "devDependencies": {
     "cordova-android": "^14.0.1",
     "cordova-plugin-mwa": "file:cordova-plugin-mwa",
-    "cordova-plugin-play-billing": "file:cordova-plugin-play-billing"
+    "cordova-plugin-play-billing": "file:cordova-plugin-play-billing",
+    "cordova-plugin-openzoo-clipboard": "file:cordova-plugin-openzoo-clipboard"
   },
   "cordova": {
     "platforms": [
@@ -43,7 +45,8 @@
     ],
     "plugins": {
       "cordova-plugin-mwa": {},
-      "cordova-plugin-play-billing": {}
+      "cordova-plugin-play-billing": {},
+      "cordova-plugin-openzoo-clipboard": {}
     }
   }
 }
