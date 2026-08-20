@@ -176,41 +176,71 @@
       return { mode: "pay", symbol: payable[0].symbol, accept: payable[0].accept, annotated: payable[0] };
     }
 
-    var wrappable = [];
-    for (var i = 0; i < annotated.length; i++) {
-      var a = annotated[i];
-      var under = a.acquire && a.acquire.underlying && a.acquire.underlying.address;
-      if (!under) continue;
-      if (asBigInt(underlyings[under]) > 0n) {
-        wrappable.push({
-          symbol: a.symbol,
-          accept: a.accept,
-          annotated: a,
-          underlying: under,
-          underlyingSymbol: a.acquire.underlying.symbol || heldName(under),
-          underlyingRaw: String(underlyings[under] || "0"),
-        });
-      }
-    }
-    wrappable.sort(function (a, b) {
-      return asBigInt(b.underlyingRaw) > asBigInt(a.underlyingRaw) ? 1 : -1;
+    var useful = pickLargestUseful(annotated, underlyings, {
+      twins: twins,
+      depositForShares: balances.depositForShares,
+      reserves: balances.reserves,
+      supply: balances.supply,
     });
-    if (wrappable.length) {
-      return {
-        mode: "wrap",
-        symbol: wrappable[0].symbol,
-        accept: wrappable[0].accept,
-        annotated: wrappable[0].annotated,
-        underlying: wrappable[0].underlying,
-        underlyingSymbol: wrappable[0].underlyingSymbol,
-        underlyingRaw: wrappable[0].underlyingRaw,
-      };
+    if (useful) {
+      return Object.assign({ mode: "wrap" }, useful);
     }
 
     return {
       mode: "need-funds",
       heldUnderlying: heldPlainNames(underlyings),
       empty: heldPlainNames(underlyings).length === 0,
+    };
+  }
+
+  /**
+   * Pick the largest held underlying that can wrap a 402.
+   * Do NOT compare underlying raw to twin maxAmountRequired — $10 TOKEN
+   * (6dp) is not in the same units as a wTOKENx2 quote. Gate on held > 0,
+   * and on depositForShares when pool reserves/supply are provided.
+   */
+  function pickLargestUseful(annotated, underlyings, opts) {
+    opts = opts || {};
+    underlyings = underlyings || {};
+    var twins = opts.twins || {};
+    var depositFn = opts.depositForShares;
+    var reserves = opts.reserves || {};
+    var supply = opts.supply || {};
+    var candidates = [];
+    (annotated || []).forEach(function (a) {
+      var under = a.acquire && a.acquire.underlying && a.acquire.underlying.address;
+      if (!under) return;
+      var held = asBigInt(underlyings[under]);
+      if (held <= 0n) return;
+      if (typeof depositFn === "function" && (reserves[under] != null || supply[a.accept.asset] != null)) {
+        var twinHave = asBigInt(twins[a.accept.asset]);
+        var need = asBigInt(a.accept.maxAmountRequired) - twinHave;
+        if (need < 0n) need = 0n;
+        var deposit = depositFn(need, reserves[under] || 0, supply[a.accept.asset] || 0);
+        if (held < asBigInt(deposit)) return;
+      }
+      candidates.push({
+        symbol: a.symbol,
+        accept: a.accept,
+        annotated: a,
+        underlying: under,
+        underlyingSymbol: (a.acquire.underlying && a.acquire.underlying.symbol) || heldName(under),
+        underlyingRaw: String(held),
+      });
+    });
+    candidates.sort(function (a, b) {
+      return asBigInt(b.underlyingRaw) > asBigInt(a.underlyingRaw) ? 1 : -1;
+    });
+    return candidates[0] || null;
+  }
+
+  function wrapPromptCopy(decision) {
+    var sym = (decision && decision.underlyingSymbol) || "TOKEN";
+    return {
+      title: "Wrap " + sym + " to send this?",
+      body: "Phantom will wrap a little " + sym + " so this message can send.",
+      confirm: "Wrap " + sym,
+      symbol: sym,
     };
   }
 
@@ -232,19 +262,27 @@
 
   function fundsCopy(decision) {
     var held = (decision && decision.heldUnderlying) || [];
+    var which = held.length ? held : ["TOKEN", "USDC", "LEOS"];
     var body = held.length
-      ? "Add a little more USDC or TOKEN in Phantom, then send again. The app tops up for you."
-      : "Add USDC or TOKEN to Phantom, then send again. The app tops up for you.";
+      ? "This wallet still needs more " + held.join(" / ") + " to wrap and pay. Tap the address to copy."
+      : "Send TOKEN, USDC, or LEOS to this address, then send again. Tap the address to copy.";
     return {
-      title: "Need funds in Phantom",
+      title: held.length ? "Send " + held.join(" / ") : "Send TOKEN, USDC, or LEOS",
       body: body,
+      address: (decision && decision.address) || "",
+      which: which,
+      copyable: true,
+      kind: "tokens",
     };
   }
 
-  function wrapSolCopy() {
+  function wrapSolCopy(address) {
     return {
       title: "Need a little SOL",
-      body: "Phantom needs a little SOL to top up, then try again.",
+      body: "Phantom needs a little SOL for the wrap fee. Tap the address to copy.",
+      address: address || "",
+      copyable: true,
+      kind: "sol",
     };
   }
 
@@ -395,6 +433,8 @@
     findKindByMint: findKindByMint,
     annotateAccepts: annotateAccepts,
     pickRail: pickRail,
+    pickLargestUseful: pickLargestUseful,
+    wrapPromptCopy: wrapPromptCopy,
     heldName: heldName,
     heldPlainNames: heldPlainNames,
     fundsCopy: fundsCopy,

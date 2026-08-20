@@ -214,7 +214,31 @@
   function showFunds(copy) {
     $("fundsTitle").textContent = (copy && copy.title) || "Need funds in Phantom";
     $("fundsBody").textContent = (copy && copy.body) || "";
+    if ($("fundsWhich")) {
+      $("fundsWhich").textContent = copy && copy.which && copy.which.length
+        ? "Send " + copy.which.join(" / ")
+        : "";
+    }
+    var addr = (copy && copy.address) || P.getAddress() || "";
+    setAddrEl("fundsAddr", addr, "phantom");
     $("fundsOverlay").classList.add("show");
+  }
+
+  function showWrapPrompt(info) {
+    return new Promise(function (resolve) {
+      $("wrapTitle").textContent = (info && info.title) || "Wrap TOKEN to send this?";
+      $("wrapBody").textContent = (info && info.body) || "";
+      $("wrapOk").textContent = (info && info.confirm) || "Wrap TOKEN";
+      $("wrapOverlay").classList.add("show");
+      function done(ok) {
+        $("wrapOverlay").classList.remove("show");
+        $("wrapOk").onclick = null;
+        $("wrapCancel").onclick = null;
+        resolve(!!ok);
+      }
+      $("wrapOk").onclick = function () { done(true); };
+      $("wrapCancel").onclick = function () { done(false); };
+    });
   }
 
   function showToast(msg) {
@@ -455,6 +479,15 @@
         thinking.textContent = e.copy && e.copy.body ? e.copy.body : "Need funds in Phantom.";
         return;
       }
+      if (e && e.name === "WrapCanceledError") {
+        thinking.textContent = "Wrap canceled.";
+        return;
+      }
+      if (e && e.name === "ConnectWalletError") {
+        thinking.textContent = e.message;
+        P.requestWalletConnect();
+        return;
+      }
       if (e && e.name === "PaymentPausedError") {
         pausedThinking = { el: thinking, thread: t };
         thinking.textContent = e.message;
@@ -491,6 +524,7 @@
   }
 
   $("newBtn").onclick = function () { newThread(); };
+  if ($("headerNewBtn")) $("headerNewBtn").onclick = function () { newThread(); };
   $("menuBtn").onclick = function () {
     $("sidebar").classList.add("open");
     $("scrim").classList.add("show");
@@ -549,6 +583,7 @@
   $("walletClose").onclick = function () { $("walletOverlay").classList.remove("show"); };
   $("leaveBtn").onclick = function () { P.disconnectWallet(); };
   $("fundsClose").onclick = function () { $("fundsOverlay").classList.remove("show"); };
+  if (P.setWrapPrompt) P.setWrapPrompt(showWrapPrompt);
   $("send").onclick = send;
   $("inp").addEventListener("input", refreshSend);
   $("inp").addEventListener("keydown", function (e) {
@@ -613,6 +648,7 @@
 
   wireCopyable($("walletAddr"));
   wireCopyable($("walletDetail"));
+  wireCopyable($("fundsAddr"));
 
   if (!threads.length) newThread();
   else {

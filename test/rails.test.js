@@ -182,8 +182,27 @@ check("need-funds copy never mentions twins or wrap homework", () => {
   }, KINDS);
   assert.strictEqual(d.mode, "need-funds");
   const copy = R.fundsCopy(d);
-  assert.match(copy.body, /USDC or TOKEN/);
+  assert.match(copy.body, /TOKEN, USDC, or LEOS|USDC or TOKEN/);
+  assert.ok(copy.copyable);
   assert.doesNotMatch(copy.body, /yUSDCx|wTOKENx|wLEOSx|wrap-nav|accrue\.fund\/start|context_id|\/v1\/bind/);
+});
+
+check("pickLargestUseful does not compare TOKEN raw to twin maxAmountRequired", () => {
+  const tenToken = "10000000";
+  const annotated = R.annotateAccepts(ACCEPTS, KINDS);
+  const useful = R.pickLargestUseful(annotated, { [R.PLAIN_TOKEN]: tenToken }, {});
+  assert.ok(useful);
+  assert.strictEqual(useful.underlying, R.PLAIN_TOKEN);
+  assert.strictEqual(useful.accept.asset, WTOKENX2);
+  assert.ok(Number(tenToken) < Number(ACCEPTS.find((a) => a.asset === WTOKENX2).maxAmountRequired));
+  const d = R.pickRail(ACCEPTS, {
+    twins: { [YUSDCX]: "0", [WTOKENX2]: "0", [WLEOSX]: "0" },
+    underlyings: { [R.PLAIN_TOKEN]: tenToken },
+  }, KINDS);
+  assert.strictEqual(d.mode, "wrap");
+  assert.strictEqual(d.underlyingSymbol, "TOKEN");
+  const prompt = R.wrapPromptCopy(d);
+  assert.match(prompt.title, /Wrap TOKEN to send this\?/);
 });
 
 check("bind payload stays internal", () => {
@@ -282,6 +301,7 @@ check("UI never shows context ids, /v1/bind, hashes, or twin homework", () => {
   assert.match(html, /Attach files/);
   assert.match(html, /Attach folder/);
   assert.match(html, /Paste text/);
+  assert.match(html, /New chat/);
   assert.match(app, /userVisibleStatus/);
   assert.doesNotMatch(app, /bound ctx|context_id\.slice|bindStatus/);
 });
