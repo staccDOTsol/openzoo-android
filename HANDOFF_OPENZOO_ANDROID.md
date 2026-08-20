@@ -31,8 +31,8 @@ x402 pay path. Store Android stays Play Billing only.
 
 ## Product scope
 
-Ship the grokui client on this Cordova shell: **threads / chat / attach**.
-Bind is abstract — never show context ids, `/v1/bind`, or bind hashes.
+Ship the grokui client on this Cordova shell: **threads / chat / attach /
+race**. Bind is abstract — never show context ids, `/v1/bind`, or bind hashes.
 
 Do **not** port RUN / WRITE / READ / SERVE. Those stay off this app.
 
@@ -86,6 +86,7 @@ www/app/index.html                  grokui threads + composer + attach + Setting
 www/app/js/rails.js                 gateway + subscription Bearer key
 www/app/js/bind.js                  abstract attach → corpus
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
+www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
 cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
@@ -104,3 +105,10 @@ Long threads use the same spill as `npx openzoo claude`: bind the transcript
 prefix to a per-thread context id, then POST system + last few turns with
 `x-hrr-context`. Never send that header together with the full messages
 array. HUD savings is `directUsd / spentUsd` — do not sum `savesVsDirect`.
+
+Race (not spill, not desktop podagent / SPAWN / worktrees): first X countable
+back of Y, default first 2 of 4, from the selected band (cheap / medium /
+expensive / grok4.6). Cheap classifier among those X; if none clear, last of
+those X. Empty / HTTP / pay / fetch-failed are not countable. All-fail never
+ships a single model's fetch-failed as the winner. Do not wait on the slowest.
+Live status is `racing k/n back…`. Play Billing only — no x402, no wallet.

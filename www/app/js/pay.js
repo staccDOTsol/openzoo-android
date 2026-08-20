@@ -69,6 +69,7 @@
       method: options.method || "GET",
       headers: headers,
       body: options.body,
+      signal: options.signal,
     }).then(function (res) {
       if (res.status === 404) {
         return readBody(res).then(function (body) {
@@ -100,6 +101,7 @@
       return res;
     }).catch(function (e) {
       if (e && (e.name === "SubscriptionRequiredError" || e.name === "ContextNotFoundError")) throw e;
+      if (e && (e.name === "AbortError" || e.code === "ABORT_ERR")) throw e;
       if (R.looksNetworkGarbage(e)) throw new Error(R.friendlyNetworkMessage());
       throw e;
     });

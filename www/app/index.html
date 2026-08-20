@@ -48,6 +48,9 @@
   .dial { border: 1px solid #2c2c2e; background: #131315; color: #8e8e93; font: inherit; font-size: 11px;
           border-radius: 999px; padding: 4px 8px; cursor: pointer; max-width: 140px; }
   .dial:hover { color: #ececec; border-color: #3a3a3c; }
+  .dial.hot { color: #ececec; border-color: #5e5ce6; }
+  #model.hidden-dial { display: none; }
+  #tierSel, #raceSel { max-width: 108px; }
   #headerNewBtn {
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
     background: #fff; color: #000; border: 0; border-radius: 999px;
@@ -125,6 +128,7 @@
     #scrim.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30; }
     #headerNewBtn { display: inline-flex; }
     #model { max-width: 72px; }
+    #tierSel, #raceSel { max-width: 86px; }
   }
 </style>
 </head>
@@ -151,6 +155,26 @@
       <div id="headerDials">
         <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
         <datalist id="modelList"></datalist>
+        <select class="dial" id="tierSel" data-component="model-tier" aria-label="Model band">
+          <option value="cheap">cheap</option>
+          <option value="medium" selected>medium</option>
+          <option value="expensive">expensive</option>
+          <option value="grok4.6">grok4.6</option>
+        </select>
+        <select class="dial" id="raceSel" data-component="model-race" aria-label="Race models">
+          <option value="0">1 model</option>
+          <optgroup label="first back wins">
+            <option value="2">race 2</option>
+            <option value="3">race 3</option>
+            <option value="4">race 4</option>
+          </optgroup>
+          <optgroup label="judge the first k back">
+            <option value="2 3">best 2 of 3</option>
+            <option value="2 4" selected>best 2 of 4</option>
+            <option value="3 4">best 3 of 4</option>
+            <option value="4 4">best 4 of 4</option>
+          </optgroup>
+        </select>
         <button class="dial" id="settingsBtn" type="button">settings</button>
       </div>
     </div>
@@ -207,6 +231,7 @@
 <script src="js/rails.js"></script>
 <script src="js/bind.js"></script>
 <script src="js/spill.js"></script>
+<script src="js/race.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>
 </body>

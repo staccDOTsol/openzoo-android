@@ -60,7 +60,9 @@ check("no wallet / wrap / x402 pay path in shipped JS", () => {
   const pay = read("www/app/js/pay.js");
   const shell = read("www/index.html");
   const app = read("www/app/js/app.js");
+  const race = read("www/app/js/race.js");
   assert.doesNotMatch(pay, /walletPayEnabled|wallet-sign|wallet-connect|requestWalletConnect/);
+  assert.doesNotMatch(race, /walletPayEnabled|wallet-sign|wallet-connect|requestWalletConnect|X-PAYMENT/);
   assert.doesNotMatch(shell, /connectMWA|wallet-connect-request|MWA\.signTransaction|MWA\.authorize/);
   assert.doesNotMatch(app, /showFunds|showWrapPrompt|requestWalletConnect|Connect Phantom/);
   assert.match(pay, /SubscriptionRequiredError/);
@@ -87,6 +89,7 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/rails.js",
     "www/app/js/bind.js",
     "www/app/js/spill.js",
+    "www/app/js/race.js",
     "www/js/clipboard.js",
     "www/js/billing.js",
   ].map(read).join("\n");
@@ -108,6 +111,8 @@ check("UI never shows context ids, /v1/bind, hashes, or wallet chrome", () => {
   assert.match(html, /id="headerNewBtn"/);
   assert.match(html, /id="sideNewBtn"/);
   assert.match(html, />New chat</);
+  assert.match(html, /id="raceSel"/);
+  assert.match(html, /id="tierSel"/);
   assert.match(html, /#headerNewBtn\s*\{[\s\S]*?display:\s*inline-flex/);
   assert.doesNotMatch(html, /id="headerNewBtn"[^>]*class="dial"/);
   assert.doesNotMatch(html, /#headerNewBtn\s*\{\s*display:\s*none/);
