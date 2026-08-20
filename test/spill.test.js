@@ -116,7 +116,7 @@ check("shipped chat fetch uses spill and never dumps t.messages with x-hrr-conte
   assert.doesNotMatch(app, /savesVsDirect/);
   assert.doesNotMatch(app, /SPAWN|worktree|PING:|childKickoff/);
   assert.match(read("www/app/index.html"), /js\/race\.js/);
-  assert.doesNotMatch(read("www/app/js/race.js"), /function spawn|worktree|podagent/);
+  assert.doesNotMatch(read("www/app/js/race.js"), /function spawn|childKickoff|worktree/);
   assert.doesNotMatch(app, /if \(t\.ctx\) h\["x-hrr-context"\]/);
 });
 

@@ -6,7 +6,7 @@
  * Empty / HTTP / pay / fetch-failed are not countable. All-fail never ships
  * a single model's fetch-failed as the winner. Do not wait on the slowest.
  *
- * This is the race, not spill, and not desktop podagent / SPAWN / worktrees.
+ * This is the phone race, not spill, and not a local-agent desktop port.
  */
 (function (root, factory) {
   var api = factory();
