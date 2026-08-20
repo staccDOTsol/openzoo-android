@@ -1,4 +1,4 @@
-package com.example.cordovaseeker;
+package fun.openzoo.android;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
@@ -23,10 +23,10 @@ import java.util.concurrent.TimeoutException;
 
 public class MWAPlugin extends CordovaPlugin {
     private static final String TAG = "MWAPlugin";
-    // Dapp identity shown in the wallet's approval dialog — customize for your game
-    private static final String IDENTITY_URI  = "https://example.com";
-    private static final String IDENTITY_ICON = "icons/icon-192.png";
-    private static final String IDENTITY_NAME = "CordovaSeeker";
+    // Dapp identity shown in Phantom's approval dialog
+    private static final String IDENTITY_URI  = "https://github.com/staccDOTsol/openzoo-android";
+    private static final String IDENTITY_ICON = "favicon.ico";
+    private static final String IDENTITY_NAME = "OpenZoo";
     private static final String CHAIN         = "solana:mainnet";
     private static final int SCENARIO_TIMEOUT_MS = 90000;
     private static final String B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

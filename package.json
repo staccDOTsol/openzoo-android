@@ -1,10 +1,13 @@
 {
-  "name": "com.example.cordovaseeker",
-  "displayName": "CordovaSeeker",
+  "name": "fun.openzoo.android",
+  "displayName": "OpenZoo",
   "version": "1.0.0",
-  "description": "Open-source template for building Solana Seeker games with plain web tech — Cordova shell + native Mobile Wallet Adapter plugin, no Unity required",
+  "description": "OpenZoo for Android 14+ / Google Play — chat, bind, and stats paid from the user's Phantom wallet via Mobile Wallet Adapter and x402",
   "main": "index.js",
   "scripts": {
+    "test": "node test/rails.test.js && node test/smoke-gateway.js",
+    "test:rails": "node test/rails.test.js",
+    "test:gateway": "node test/smoke-gateway.js",
     "build": "cordova build android",
     "build:release": "cordova build android --release",
     "run": "cordova run android",
@@ -14,9 +17,17 @@
   "keywords": [
     "ecosystem:cordova",
     "solana",
-    "seeker",
-    "mobile-wallet-adapter"
+    "phantom",
+    "mobile-wallet-adapter",
+    "x402",
+    "openzoo"
   ],
+  "author": "staccDOTsol",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/staccDOTsol/openzoo-android.git"
+  },
+  "homepage": "https://github.com/staccDOTsol/openzoo-android",
   "license": "MIT",
   "devDependencies": {
     "cordova-android": "^14.0.1",

@@ -6,9 +6,13 @@ It is **not** the Seeker dApp store (`fun.openzoo.seeker`) and **not** PSG1
 (`fun.openzoo.psg1`). Those are separate products. Do not mix their widget
 ids, branding, or feature sets into this repo.
 
-The next agent implements the product on top of this stock Cordova + MWA
-template. Do **not** implement payment or rebrand `config.xml` as part of this
-import — that is the follow-up step.
+The generic Play Store product (chat + bind + stats, `fun.openzoo.android`,
+x402 via `MWA.signTransaction`) is implemented on this tree. Keep the facts
+below; do not re-import the stock clicker or reuse another OpenZoo widget id.
+
+Stay on this Cordova + MWA shell (FreeSolDev/CordovaSeeker lineage, already
+in-repo). Do **not** rewrite to Capacitor. Do **not** push to FreeSolDev —
+this product lives on `staccDOTsol/openzoo-android` only.
 
 ---
 
@@ -44,33 +48,34 @@ Prefer, in order:
 
 1. **yUSDCx** if the wallet can pay on that rail
 2. else **wTOKENx**
-3. else if the wallet only has plain **USDC**, **STEER** (prompt / convert) —
-   do not drop the user with a silent failure
+3. else **wLEOSx**
+4. else if the wallet only has plain **USDC** (or TOKEN / LEOS), **STEER**
+   in plain language (“pays with USDC on Solana”, open
+   https://x402.accrue.fund/start) — do not drop the user with a silent
+   failure. Do not make them hunt a ticker named yUSDCx.
 
 ## What this import is
 
 Stock Cordova + MWA template copied from `openzoo-mobile` (itself a
 CordovaSeeker-style shell), plus this handoff and the GUI reference.
 
-Still stock / not yet rebranded:
+Shipped on this tree (do not regress):
 
-- `config.xml` widget id (`com.example.cordovaseeker`)
+- `config.xml` widget id `fun.openzoo.android`, name OpenZoo
 - `package.json` name / displayName
-- `www/index.html` wallet shell + demo clicker in `www/game/`
-
-The follow-up agent should rebrand to `fun.openzoo.android` / OpenZoo, wire
-chat + bind + stats, and implement the payment path above.
+- `www/index.html` wallet shell + bundled chat UI in `www/app/`
+- 402 pay loop with balance probe + USDC steer (no on-device wrap)
 
 ## Template reminder (do not reinvent)
 
 ```
 www/index.html          wallet shell — owns MWA, runs the app in an iframe
-www/game/               demo clicker (delete or ignore)
+www/app/index.html      bundled chat + bind + stats (402 pay loop)
 www/app/gui.desktop.html
-                        Seeker desktop GUI reference
+                        desktop GUI reference (not loaded)
 cordova-plugin-mwa/     ~300 lines of Java: authorize, signMessage,
                         signTransaction, signAndSendTransaction
-config.xml              rebrand widget id → fun.openzoo.android
+config.xml              widget id fun.openzoo.android
 ```
 
 `MWA.signTransaction(txB64, ok, err)` returns `{ signedTransaction }` (base64).
