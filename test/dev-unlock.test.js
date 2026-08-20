@@ -69,11 +69,11 @@ function walkFiles(dir, acc) {
   assert.doesNotMatch(html, /checkout\.stripe\.com/);
   assert.doesNotMatch(html, /\/api\/billing\/checkout/);
   const pay = load("www/app/js/pay.js");
-  assert.match(pay, /walletPayEnabled = false/);
-  console.log("ok store UI still Play Billing; no wallet pay default");
+  assert.doesNotMatch(pay, /walletPayEnabled|wallet-connect|requestWalletConnect/);
+  console.log("ok store UI still Play Billing; no wallet pay");
 })();
 
-(function headerNewChatAndCopyStay() {
+(function headerNewChatStays() {
   const html = load("www/app/index.html");
   const app = load("www/app/js/app.js");
   assert.match(html, /id="headerNewBtn"/);
@@ -82,9 +82,9 @@ function walkFiles(dir, acc) {
   assert.match(app, /function startNewChat\(\) \{ newThread\(\); \}/);
   assert.match(app, /headerNewBtn.*startNewChat/);
   assert.match(app, /sideNewBtn/);
-  assert.match(app, /copyAddress/);
-  assert.match(html, /data-copy-kind="phantom"/);
-  console.log("ok New chat + tap-to-copy stay");
+  assert.doesNotMatch(html, /data-copy-kind="phantom"/);
+  assert.doesNotMatch(app, /copyAddress/);
+  console.log("ok New chat stays; wallet copy is gone");
 })();
 
 (function pluginBridgeExposesUnlockOnlyViaNative() {

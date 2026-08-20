@@ -1,5 +1,5 @@
 /**
- * Address copy helpers. Native path is Android ClipboardManager via the
+ * Copy helpers. Native path is Android ClipboardManager via the
  * Cordova plugin — never rely on navigator.clipboard (dead in WebView).
  */
 (function (root, factory) {
@@ -12,11 +12,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  function toastLabel(kind) {
-    var k = String(kind || "").toLowerCase();
-    if (k === "burner" || k === "local-burner" || k === "local burner") {
-      return "copied local burner";
-    }
+  function toastLabel() {
     return "copied";
   }
 
