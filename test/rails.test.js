@@ -266,6 +266,8 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/rails.js",
     "www/app/js/wrap.js",
     "www/app/js/bind.js",
+    "www/js/clipboard.js",
+    "www/js/billing.js",
   ].map(read).join("\n");
   assert.doesNotMatch(joined, /@solana\/web3\.js|@solana\/spl-token/);
   assert.doesNotMatch(joined, /:8402/);

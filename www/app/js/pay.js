@@ -431,6 +431,33 @@
   SubscriptionRequiredError.prototype = Object.create(Error.prototype);
   SubscriptionRequiredError.prototype.constructor = SubscriptionRequiredError;
 
+  function PaymentPausedError(message) {
+    this.name = "PaymentPausedError";
+    this.message = message || R.friendlyNetworkMessage();
+  }
+  PaymentPausedError.prototype = Object.create(Error.prototype);
+  PaymentPausedError.prototype.constructor = PaymentPausedError;
+
+  function pauseForWallet(path, options, extra) {
+    R.savePending402(Object.assign({
+      path: path,
+      at: Date.now(),
+      payer: walletAddress,
+    }, R.persistableOptions(options), extra || {}));
+  }
+
+  function wrapNetwork(err, path, options) {
+    if (err && (err.name === "FundsError" || err.name === "SubscriptionRequiredError" ||
+        err.name === "ContextNotFoundError" || err.name === "PaymentPausedError")) {
+      throw err;
+    }
+    if (R.looksNetworkGarbage(err)) {
+      pauseForWallet(path, options, { reason: "network" });
+      throw new PaymentPausedError();
+    }
+    throw err;
+  }
+
   function paidFetch(path, options) {
     options = options || {};
     var payer = walletAddress;
@@ -461,6 +488,7 @@
         );
       }
       return readBody(res).then(function (challenge) {
+        pauseForWallet(path, options, { challenge: challenge.json || {}, payer: payer });
         return paymentHeaderFor(challenge.json || {}, payer, options.onStage).then(function (header) {
           var retryHeaders = Object.assign({}, headers, { "X-PAYMENT": header });
           return fetch(R.GATEWAY + path, {
@@ -468,9 +496,13 @@
             headers: retryHeaders,
             body: options.body,
           }).then(function (retry) {
-            if (retry.ok) return retry;
+            if (retry.ok) {
+              R.clearPending402();
+              return retry;
+            }
             return readBody(retry).then(function (failed) {
               var msg = errText((failed.json && (failed.json.error || failed.json.message)) || failed.raw || ("HTTP " + retry.status));
+              if (R.looksNetworkGarbage(msg)) throw new PaymentPausedError();
               if (R.looksUnderfunded(msg)) {
                 throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
               }
@@ -482,7 +514,39 @@
           });
         });
       });
+    }).catch(function (e) {
+      wrapNetwork(e, path, options);
     });
+  }
+
+  function resumePending402() {
+    var job = R.loadPending402();
+    if (!job || !job.path) return Promise.resolve(null);
+    return paidFetch(job.path, {
+      method: job.method,
+      headers: job.headers || {},
+      body: job.body,
+    });
+  }
+
+  function onAppResume() {
+    var job = R.loadPending402();
+    if (!job) return;
+    root.dispatchEvent(new CustomEvent("openzoo-402-retry", { detail: job }));
+  }
+
+  root.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || !data.type) return;
+    if (data.type === "app-resume" || data.type === "app-pause") {
+      if (data.type === "app-resume") onAppResume();
+    }
+  });
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") onAppResume();
+    });
+    document.addEventListener("resume", onAppResume, false);
   }
 
   function holdingsForWallet() {
@@ -514,9 +578,11 @@
     probeBalances: probeBalances,
     loadDirectory: loadDirectory,
     paidFetch: paidFetch,
+    resumePending402: resumePending402,
     holdingsForWallet: holdingsForWallet,
     FundsError: FundsError,
     ContextNotFoundError: ContextNotFoundError,
     SubscriptionRequiredError: SubscriptionRequiredError,
+    PaymentPausedError: PaymentPausedError,
   };
 })(typeof window !== "undefined" ? window : globalThis);

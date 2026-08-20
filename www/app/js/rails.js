@@ -38,6 +38,14 @@
 
   var directoryCache = { at: 0, kinds: null };
   var subscriptionKey = null;
+  var PENDING_402_KEY = "openzoo.android.pending402.v1";
+  var CONNECT_ORIGINS = [
+    "https://zoo.openzoo.fun",
+    "https://x402-tokens.fly.dev",
+    "https://x402.accrue.fund",
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-rpc.publicnode.com",
+  ];
 
   function setSubscriptionKey(key) {
     subscriptionKey = key || null;
@@ -268,6 +276,49 @@
     return /no sol|insufficient.*lamports|insufficient funds for (rent|fee)|need .*sol\b/.test(s);
   }
 
+  function looksNetworkGarbage(err) {
+    var s = String((err && err.message) || err || "");
+    return /load failed|failed to fetch|networkerror|net::|err_internet|err_connection|err_name_not_resolved|err_timed_out|the internet connection appears|nsurlerror|webview|nserror|network request failed|the network connection was lost|offline|econnreset|ehostunreach|etimedout/i.test(s);
+  }
+
+  function friendlyNetworkMessage() {
+    return "Connection dropped while the wallet was open. Finish in Phantom — this app retries when you come back.";
+  }
+
+  function persistableOptions(options) {
+    options = options || {};
+    var headers = {};
+    var src = options.headers || {};
+    Object.keys(src).forEach(function (k) {
+      if (k.toLowerCase() === "x-payment") return;
+      headers[k] = src[k];
+    });
+    return {
+      method: options.method || "GET",
+      headers: headers,
+      body: typeof options.body === "string" ? options.body : (options.body == null ? null : JSON.stringify(options.body)),
+    };
+  }
+
+  function savePending402(job, storage) {
+    storage = storage || (typeof sessionStorage !== "undefined" ? sessionStorage : null);
+    if (!storage || !job) return job;
+    try { storage.setItem(PENDING_402_KEY, JSON.stringify(job)); } catch (e) {}
+    return job;
+  }
+
+  function loadPending402(storage) {
+    storage = storage || (typeof sessionStorage !== "undefined" ? sessionStorage : null);
+    if (!storage) return null;
+    try { return JSON.parse(storage.getItem(PENDING_402_KEY) || "null"); }
+    catch (e) { return null; }
+  }
+
+  function clearPending402(storage) {
+    storage = storage || (typeof sessionStorage !== "undefined" ? sessionStorage : null);
+    if (storage) try { storage.removeItem(PENDING_402_KEY); } catch (e) {}
+  }
+
   function encodePaymentHeader(envelope, signedTxB64) {
     var payload = Object.assign({}, (envelope && envelope.payload) || {}, {
       transaction: signedTxB64,
@@ -350,6 +401,14 @@
     wrapSolCopy: wrapSolCopy,
     looksUnderfunded: looksUnderfunded,
     looksNoSol: looksNoSol,
+    looksNetworkGarbage: looksNetworkGarbage,
+    friendlyNetworkMessage: friendlyNetworkMessage,
+    persistableOptions: persistableOptions,
+    PENDING_402_KEY: PENDING_402_KEY,
+    CONNECT_ORIGINS: CONNECT_ORIGINS,
+    savePending402: savePending402,
+    loadPending402: loadPending402,
+    clearPending402: clearPending402,
     encodePaymentHeader: encodePaymentHeader,
     decodePaymentHeader: decodePaymentHeader,
     defaultModelId: defaultModelId,

@@ -22,6 +22,8 @@
     <allow-intent href="https://*/*" />
     <!-- MWA uses solana-wallet:// to discover Phantom and other wallets -->
     <allow-intent href="solana-wallet://*" />
+    <!-- Extra Phantom custom scheme only. Never the HTTPS /ul/ browse link. -->
+    <allow-intent href="phantom://v1/*" />
 
     <preference name="Fullscreen" value="true" />
     <preference name="StatusBarOverlaysWebView" value="false" />

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="cordova-plugin-openzoo-clipboard"
+        version="1.0.0">
+    <name>OpenZoo Clipboard</name>
+    <description>Android ClipboardManager write — not navigator.clipboard</description>
+
+    <js-module src="www/clipboard.js" name="OpenZooClipboard">
+        <clobbers target="OpenZooClipboard" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="OpenZooClipboard">
+                <param name="android-package" value="fun.openzoo.android.OpenZooClipboardPlugin" />
+            </feature>
+        </config-file>
+        <source-file src="src/android/OpenZooClipboardPlugin.java"
+                     target-dir="src/fun/openzoo/android" />
+    </platform>
+</plugin>
