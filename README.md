@@ -4,7 +4,9 @@ Generic **OpenZoo** for any Android 14+ phone, shipped via Google Play.
 Apache Cordova shell + **Google Play Billing** first-run.
 
 This is the same product as the desktop grokui client: **threads, chat**,
-and **attach → bind behind the scenes**. Subscription keys come from
+**attach → bind behind the scenes**, and a **race dial** (first X countable
+back of Y, default best 2 of 4 from a cheap / medium / expensive / grok4.6
+band). Subscription keys come from
 [zoo.openzoo.fun/subscriptions](https://zoo.openzoo.fun/subscriptions)
 (`GET https://zoo.openzoo.fun/api/billing/tiers`). Tagline:
 **Subscription keys · no x402**.
@@ -38,6 +40,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 │  ┌────────────────────────────────┐  │
 │  │ iframe: www/app/               │  │
 │  │  grokui threads + chat         │  │
+│  │  race dial · racing k/n back   │  │
 │  │  attach files/folder/text      │  │
 │  │  Settings → plan / change plan │  │
 │  └────────────────────────────────┘  │
@@ -59,6 +62,12 @@ Bind is **abstract**: the user attaches files, a folder, or pasted text.
 The UI never shows context ids, `/v1/bind`, or bind hashes. Chat history
 spills the same way: older turns bind once, later calls send a short tail
 plus the thread context id (never the growing thread plus that header).
+
+Race launches N models from the selected band and ships as soon as X real
+answers are back (default 2 of 4). A cheap classifier picks among those X.
+Empty, HTTP, pay, and fetch-failed replies are not countable and cannot win.
+If every racer fails, the UI shows a race-level error — never one model's
+`fetch failed`. The slowest racer is not waited on.
 
 ## Plans (copy from live `/api/billing/tiers` — do not invent prices)
 
