@@ -77,8 +77,11 @@ function walkFiles(dir, acc) {
   const html = load("www/app/index.html");
   const app = load("www/app/js/app.js");
   assert.match(html, /id="headerNewBtn"/);
+  assert.match(html, /id="sideNewBtn"/);
   assert.match(html, />New chat</);
-  assert.match(app, /headerNewBtn.*newThread/);
+  assert.match(app, /function startNewChat\(\) \{ newThread\(\); \}/);
+  assert.match(app, /headerNewBtn.*startNewChat/);
+  assert.match(app, /sideNewBtn/);
   assert.match(app, /copyAddress/);
   assert.match(html, /data-copy-kind="phantom"/);
   console.log("ok New chat + tap-to-copy stay");

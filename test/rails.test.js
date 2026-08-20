@@ -302,7 +302,12 @@ check("UI never shows context ids, /v1/bind, hashes, or twin homework", () => {
   assert.match(html, /Attach files/);
   assert.match(html, /Attach folder/);
   assert.match(html, /Paste text/);
-  assert.match(html, /New chat/);
+  assert.match(html, /id="headerNewBtn"/);
+  assert.match(html, /id="sideNewBtn"/);
+  assert.match(html, />New chat</);
+  assert.match(html, /#headerNewBtn\s*\{[\s\S]*?display:\s*inline-flex/);
+  assert.doesNotMatch(html, /id="headerNewBtn"[^>]*class="dial"/);
+  assert.doesNotMatch(html, /#headerNewBtn\s*\{\s*display:\s*none/);
   assert.match(app, /userVisibleStatus/);
   assert.doesNotMatch(app, /bound ctx|context_id\.slice|bindStatus/);
 });

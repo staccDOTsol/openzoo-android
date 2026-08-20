@@ -121,7 +121,10 @@ across the MWA backgrounding round-trip and retry on `resume`. CSP
 `depositForShares` when reserves are known). It must **not** compare
 underlying raw to twin `maxAmountRequired`. Prompt **Wrap TOKEN to send
 this?** then `MWA.signAndSend` wrap, confirm, pay. Short SOL or tokens
-shows a copyable address + toast. Header has **New chat**.
+shows a copyable address + toast.
+
+**New chat** is a labeled button on the MAIN header (one tap) and a
+labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Never open the HTTPS Phantom `/ul/` browse link. Custom scheme, if used, is
 `phantom://v1/<method>`. MWA stays the Play/Phantom payment path.
