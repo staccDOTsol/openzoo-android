@@ -110,6 +110,8 @@
     $restore.style.display = 'none';
     $status.style.display = 'none';
     document.querySelector('.powered').style.display = 'none';
+    var $dev = document.getElementById('devGate');
+    if ($dev) $dev.style.display = 'none';
 
     var iframe = document.createElement('iframe');
     iframe.id = 'game';
@@ -150,6 +152,8 @@
     $restore.style.display = '';
     $status.style.display = '';
     document.querySelector('.powered').style.display = '';
+    var $dev = document.getElementById('devGate');
+    if ($dev) $dev.style.display = '';
     var iframe = document.getElementById('game');
     if (iframe) iframe.remove();
   }
@@ -431,14 +435,70 @@
     }
   });
 
+  function playUnlockStatus() {
+    return new Promise(function (resolve) {
+      if (!window.PlayBilling || typeof window.PlayBilling.unlockStatus !== 'function') {
+        resolve({ debug: false, unlocked: false });
+        return;
+      }
+      window.PlayBilling.unlockStatus(function (st) {
+        resolve(st || { debug: false, unlocked: false });
+      }, function () {
+        resolve({ debug: false, unlocked: false });
+      });
+    });
+  }
+
+  function playTryUnlock(email) {
+    return new Promise(function (resolve, reject) {
+      if (!window.PlayBilling || typeof window.PlayBilling.tryDevUnlock !== 'function') {
+        reject(new Error('unavailable'));
+        return;
+      }
+      window.PlayBilling.tryDevUnlock(email, resolve, function (err) { reject(new Error(err)); });
+    });
+  }
+
+  function mountDevField() {
+    if (document.getElementById('devGate')) return;
+    var wrap = document.createElement('form');
+    wrap.id = 'devGate';
+    wrap.setAttribute('autocomplete', 'off');
+    wrap.style.cssText = 'margin-top:14px;width:100%;max-width:420px;';
+    var input = document.createElement('input');
+    input.id = 'devField';
+    input.type = 'email';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'none';
+    input.spellcheck = false;
+    input.placeholder = 'dev';
+    input.setAttribute('aria-label', 'dev');
+    input.style.cssText = 'width:100%;background:#0a0a0b;border:1px solid #1c1c1e;color:#6f7080;border-radius:10px;padding:7px 10px;font:inherit;font-size:12px;';
+    wrap.appendChild(input);
+    wrap.addEventListener('submit', function (e) {
+      e.preventDefault();
+      playTryUnlock(String(input.value || '').trim()).then(function () {
+        launchApp();
+      }).catch(function () {});
+    });
+    $restore.parentNode.insertBefore(wrap, $restore.nextSibling);
+  }
+
   function boot() {
-    B.loadTiers().then(function (model) {
-      renderTiers(model);
-      if (B.hasEntitlement(billingState)) {
+    playUnlockStatus().then(function (st) {
+      if (st && st.unlocked) {
         launchApp();
         return;
       }
-      setStatus(model.trialDays ? '' : 'No free trial. Google Play checkout.');
+      if (st && st.debug) mountDevField();
+      return B.loadTiers().then(function (model) {
+        renderTiers(model);
+        if (B.hasEntitlement(billingState)) {
+          launchApp();
+          return;
+        }
+        setStatus(model.trialDays ? '' : 'No free trial. Google Play checkout.');
+      });
     });
   }
 

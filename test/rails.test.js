@@ -262,6 +262,7 @@ check("first-run is Play paywall, not Phantom or Stripe", () => {
   assert.doesNotMatch(shell, /CONNECT PHANTOM/);
   assert.doesNotMatch(shell, /checkout\.stripe\.com/);
   assert.doesNotMatch(shell, /\/api\/billing\/checkout/);
+  assert.doesNotMatch(shell, /jarettrsdunn1999@gmail\.com/);
 });
 
 check("402 pay path partial-signs; wrap path may signAndSend", () => {

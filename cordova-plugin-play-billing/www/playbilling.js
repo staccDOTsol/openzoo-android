@@ -20,6 +20,12 @@ var PlayBilling = {
   acknowledge: function (purchaseToken, success, error) {
     cordovaExec(success, error, "PlayBillingPlugin", "acknowledge", [purchaseToken]);
   },
+  unlockStatus: function (success, error) {
+    cordovaExec(success, error, "PlayBillingPlugin", "unlockStatus", []);
+  },
+  tryDevUnlock: function (email, success, error) {
+    cordovaExec(success, error, "PlayBillingPlugin", "tryDevUnlock", [email || ""]);
+  },
 };
 
 module.exports = PlayBilling;
