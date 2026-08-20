@@ -50,7 +50,29 @@
   <div class="title">openzoo</div>
   <p class="sub">Pick a plan. Google Play Billing checkout — not Stripe, not a wallet. Usage invoices at $1.00.</p>
 
-  <div id="tiers" data-component="play-paywall"></div>
+  <div id="tiers" data-component="play-paywall">
+    <button type="button" class="tier" data-tier="basic" data-product="fun.openzoo.android.sub.basic">
+      <div class="thigh">&nbsp;</div>
+      <div class="tname">Basic</div>
+      <div class="tprice">$9/mo</div>
+      <div class="tblurb">One vault, one machine.</div>
+      <div class="tmeta">40% savings share · 60 rpm · bind 32MB · top-k 32</div>
+    </button>
+    <button type="button" class="tier pro" data-tier="pro" data-product="fun.openzoo.android.sub.pro">
+      <div class="thigh">Most teams want this</div>
+      <div class="tname">Pro</div>
+      <div class="tprice">$29/mo</div>
+      <div class="tblurb">A whole archive, and the breadth to actually read it.</div>
+      <div class="tmeta">20% savings share · 300 rpm · bind 512MB · top-k 128</div>
+    </button>
+    <button type="button" class="tier" data-tier="ultra" data-product="fun.openzoo.android.sub.ultra">
+      <div class="thigh">&nbsp;</div>
+      <div class="tname">Ultra</div>
+      <div class="tprice">$99/mo</div>
+      <div class="tblurb">Agents, fleets, and corpora that do not fit anywhere else.</div>
+      <div class="tmeta">10% savings share · 2000 rpm · bind ~8GB · top-k 256</div>
+    </button>
+  </div>
   <button id="restore" type="button">Restore purchases</button>
   <div id="status"></div>
   <div class="powered">fun.openzoo.android · Google Play Billing</div>
@@ -277,11 +299,14 @@
       btn.querySelector('.tblurb').textContent = t.blurb;
       btn.querySelector('.tmeta').textContent =
         t.savingsSharePct + '% savings share · ' + t.rpm + ' rpm · bind ' + t.bindLabel + ' · top-k ' + t.maxTopK;
-      btn.onclick = function () { subscribe(t.id); };
       $tiers.appendChild(btn);
     });
   }
 
+  $tiers.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-tier]');
+    if (btn) subscribe(btn.getAttribute('data-tier'));
+  });
   $restore.onclick = restore;
 
   function connectMWA() {
