@@ -74,6 +74,11 @@ Do not invent a second key system.
 
 ## What this tree is
 
+Cordova `<content src="index.html">` is the **Play paywall**, not a wallet
+landing (that iOS pattern does not apply here). After purchase / restore /
+DEBUG unlock it iframes `www/app/index.html` (chat). Do not retarget
+`content src` at the chat page — that would skip first-run Play Billing.
+
 ```
 www/index.html                      Play paywall shell — purchase / restore, then iframe
 www/js/billing.js                   tiers, product IDs, Play token → key exchange stub

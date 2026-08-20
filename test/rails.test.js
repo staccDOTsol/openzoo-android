@@ -103,6 +103,23 @@ check("UI never shows context ids, /v1/bind, hashes, or wallet chrome", () => {
   assert.doesNotMatch(app, /bound ctx|context_id\.slice|bindStatus/);
 });
 
+check("Cordova entry is the Play paywall, then iframe chat — not a wallet shell", () => {
+  const cfg = read("config.xml");
+  const shell = read("www/index.html");
+  const chat = read("www/app/index.html");
+  assert.match(cfg, /<content\s+src="index\.html"/);
+  assert.match(shell, /play-paywall/);
+  assert.match(shell, /js\/billing\.js/);
+  assert.match(shell, /GAME_URL = 'app\/index\.html'/);
+  assert.match(shell, /function launchApp/);
+  assert.match(shell, /billing-ready/);
+  assert.doesNotMatch(shell, /<script[^>]+(wallet|solana|wrap|nacl|pay402|clipboard)/i);
+  assert.doesNotMatch(shell, /Connect Phantom|Use local burner|#advanced|OpenZooIOSWallet|btn-phantom/);
+  assert.doesNotMatch(chat, /<script[^>]+(wallet|solana|wrap|nacl|pay402|clipboard)/i);
+  assert.match(chat, /id="headerNewBtn"/);
+  assert.match(chat, /id="sideNewBtn"/);
+});
+
 check("widget id is fun.openzoo.android; Cordova stays; MWA is gone", () => {
   const cfg = read("config.xml");
   const pkg = JSON.parse(read("package.json"));
