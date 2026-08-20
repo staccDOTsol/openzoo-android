@@ -12,12 +12,12 @@
     <platform name="android">
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="MWAPlugin">
-                <param name="android-package" value="com.example.cordovaseeker.MWAPlugin" />
+                <param name="android-package" value="fun.openzoo.android.MWAPlugin" />
             </feature>
         </config-file>
 
         <source-file src="src/android/MWAPlugin.java"
-                     target-dir="src/com/example/cordovaseeker" />
+                     target-dir="src/fun/openzoo/android" />
 
         <!-- MWA Java client library (NOT ktx — uses futures, not coroutines) -->
         <framework src="com.solanamobile:mobile-wallet-adapter-clientlib:2.0.8" />

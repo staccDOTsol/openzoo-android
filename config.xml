@@ -1,24 +1,26 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.example.cordovaseeker" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>CordovaSeeker</name>
-    <description>Open-source Seeker game template — Cordova + native Mobile Wallet Adapter, no Unity required</description>
-    <author href="https://github.com/your-org/cordovaseeker">
-        Your Name
+<widget id="fun.openzoo.android" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>OpenZoo</name>
+    <description>OpenZoo for Android 14+ with Phantom — chat, bind, and stats. You pay each model call from your own wallet via Mobile Wallet Adapter and x402. Not the Seeker dApp store listing and not PSG1.</description>
+    <author href="https://github.com/staccDOTsol/openzoo-android">
+        staccDOTsol
     </author>
 
-    <!-- Local shell handles wallet, loads game in iframe -->
+    <!-- Local shell owns MWA; iframe loads the bundled chat UI -->
     <content src="index.html" />
 
-    <!-- If you host your game remotely, add its domain here:
-    <allow-navigation href="https://yourgame.example.com/*" />
-    <access origin="https://yourgame.example.com" /> -->
+    <allow-navigation href="https://x402-tokens.fly.dev/*" />
+    <allow-navigation href="https://x402.accrue.fund/*" />
+    <access origin="https://x402-tokens.fly.dev" />
+    <access origin="https://x402.accrue.fund" />
+    <access origin="https://api.mainnet-beta.solana.com" />
+    <access origin="https://solana-rpc.publicnode.com" />
 
-    <!-- Open wallet / external links in system browser -->
+    <!-- Open wrap / help links in the system browser -->
     <allow-intent href="https://*/*" />
-    <!-- MWA uses solana-wallet:// scheme to discover & connect native wallet apps -->
+    <!-- MWA uses solana-wallet:// to discover Phantom and other wallets -->
     <allow-intent href="solana-wallet://*" />
 
-    <!-- Fullscreen immersive mode -->
     <preference name="Fullscreen" value="true" />
     <preference name="StatusBarOverlaysWebView" value="false" />
     <preference name="StatusBarBackgroundColor" value="#000000" />
@@ -30,23 +32,17 @@
     <preference name="FadeSplashScreen" value="false" />
     <preference name="AutoHideSplashScreen" value="true" />
     <preference name="DisallowOverscroll" value="true" />
+    <preference name="android-minSdkVersion" value="34" />
 
-    <!-- Android specific -->
     <platform name="android">
         <preference name="AndroidWindowSplashScreenBackground" value="#0a0a18" />
         <preference name="AndroidPersistentFileLocation" value="Compatibility" />
-        <!-- Allow CDN imports (esm.sh) from file:// origin -->
         <preference name="AndroidInsecureFileModeEnabled" value="true" />
-        <!-- Immersive sticky hides nav + status bars -->
         <preference name="immersiveMode" value="true" />
-        <!-- Allow video autoplay without user gesture -->
         <preference name="MediaPlaybackRequiresUserAction" value="false" />
-        <!-- Use hardware back button to quit (no history to navigate) -->
         <preference name="OverrideBackButton" value="true" />
-        <!-- singleTask: relaunches (e.g. returning from the wallet app) reuse the existing activity instead of recreating it -->
         <preference name="AndroidLaunchMode" value="singleTask" />
 
-        <!-- Icons -->
         <icon density="ldpi" src="res/icon/android/ldpi.png" />
         <icon density="mdpi" src="res/icon/android/mdpi.png" />
         <icon density="hdpi" src="res/icon/android/hdpi.png" />
