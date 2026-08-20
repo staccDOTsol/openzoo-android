@@ -73,6 +73,15 @@ Play Console must create the three monthly subscription product IDs above.
 
 ## Optional crypto (Settings later)
 
+Addresses are selectable. Tap or select copies via Android ClipboardManager
+(toast **copied**; a local burner would say **copied local burner**).
+
+x402 does not show raw WebView **Load failed**. A 402 is persisted while
+Phantom is in the foreground and retried on resume.
+
+Never open the HTTPS Phantom `/ul/` browse link. Custom scheme is
+`phantom://v1/<method>` only. MWA is the Play/Phantom payment path.
+
 Phantom / x402 wrap is **off by default** and lives behind Settings. If
 enabled later:
 

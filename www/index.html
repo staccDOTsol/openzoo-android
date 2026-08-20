@@ -79,6 +79,7 @@
 
   <script src="cordova.js"></script>
   <script src="js/billing.js"></script>
+  <script src="js/clipboard.js"></script>
   <script>
   'use strict';
 
@@ -337,6 +338,28 @@
     var data = event.data;
     if (!data || !data.type) return;
 
+    if (data.type === 'clipboard-copy') {
+      var text = data.text || '';
+      var reply = function (payload) {
+        payload.type = 'clipboard-copied';
+        payload.id = data.id;
+        gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
+      };
+      var native = window.OpenZooClipboard && typeof window.OpenZooClipboard.copy === 'function'
+        ? function (value) {
+            return new Promise(function (resolve, reject) {
+              window.OpenZooClipboard.copy(value, resolve, function (err) { reject(new Error(err)); });
+            });
+          }
+        : null;
+      var copyApi = window.OpenZooCopy;
+      var job = copyApi
+        ? copyApi.copyText(text, native)
+        : (native ? native(text) : Promise.reject(new Error('clipboard unavailable')));
+      job.then(function () { reply({}); }).catch(function (e) { reply({ error: String((e && e.message) || e) }); });
+      return;
+    }
+
     if (data.type === 'billing-sign-out') {
       persistBilling({});
       showPaywall();
@@ -423,6 +446,15 @@
     log('deviceready');
     boot();
   }, false);
+
+  function notifyApp(type) {
+    var iframe = document.getElementById('game');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ type: type }, GAME_ORIGIN);
+    }
+  }
+  document.addEventListener('pause', function () { notifyApp('app-pause'); }, false);
+  document.addEventListener('resume', function () { notifyApp('app-resume'); }, false);
 
   // Browser / unit environments still render the Play paywall, never Stripe or Phantom first.
   if (!window.cordova) boot();

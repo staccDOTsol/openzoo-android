@@ -4,6 +4,7 @@
   var R = window.OpenZooRails;
   var P = window.OpenZooPay;
   var B = window.OpenZooBind;
+  var C = window.OpenZooCopy;
   var $ = function (id) { return document.getElementById(id); };
   var STORE = "openzoo.android.grokui.v1";
   var PALETTE = ["#e91e8c", "#34c759", "#ff9500", "#5e5ce6", "#ff3b30", "#0a84ff", "#00c7be"];
@@ -17,6 +18,8 @@
   var threads = Array.isArray(saved.threads) ? saved.threads : [];
   var activeId = saved.activeId || null;
   var busy = false;
+  var pausedThinking = null;
+  var resumeBusy = false;
 
   function persist() {
     localStorage.setItem(STORE, JSON.stringify({ threads: threads, activeId: activeId }));
@@ -211,12 +214,101 @@
   function showFunds(copy) {
     $("fundsTitle").textContent = (copy && copy.title) || "Need funds in Phantom";
     $("fundsBody").textContent = (copy && copy.body) || "";
+    if ($("fundsWhich")) {
+      $("fundsWhich").textContent = copy && copy.which && copy.which.length
+        ? "Send " + copy.which.join(" / ")
+        : "";
+    }
+    var addr = (copy && copy.address) || P.getAddress() || "";
+    setAddrEl("fundsAddr", addr, "phantom");
     $("fundsOverlay").classList.add("show");
   }
 
-  function shortAddr(addr) {
-    if (!addr) return "not connected";
-    return addr.slice(0, 4) + "…" + addr.slice(-4);
+  function showWrapPrompt(info) {
+    return new Promise(function (resolve) {
+      $("wrapTitle").textContent = (info && info.title) || "Wrap TOKEN to send this?";
+      $("wrapBody").textContent = (info && info.body) || "";
+      $("wrapOk").textContent = (info && info.confirm) || "Wrap TOKEN";
+      $("wrapOverlay").classList.add("show");
+      function done(ok) {
+        $("wrapOverlay").classList.remove("show");
+        $("wrapOk").onclick = null;
+        $("wrapCancel").onclick = null;
+        resolve(!!ok);
+      }
+      $("wrapOk").onclick = function () { done(true); };
+      $("wrapCancel").onclick = function () { done(false); };
+    });
+  }
+
+  function showToast(msg) {
+    var el = $("toast");
+    if (!el) return;
+    el.textContent = msg || "copied";
+    el.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { el.classList.remove("show"); }, 1600);
+  }
+
+  function parentCopy(text) {
+    return new Promise(function (resolve, reject) {
+      if (!window.parent || window.parent === window) {
+        reject(new Error("no shell"));
+        return;
+      }
+      var id = "copy-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      var done = false;
+      function onMsg(e) {
+        var data = e.data;
+        if (!data || data.type !== "clipboard-copied" || data.id !== id) return;
+        window.removeEventListener("message", onMsg);
+        done = true;
+        if (data.error) reject(new Error(data.error));
+        else resolve();
+      }
+      window.addEventListener("message", onMsg);
+      window.parent.postMessage({ type: "clipboard-copy", id: id, text: text }, "*");
+      setTimeout(function () {
+        if (done) return;
+        window.removeEventListener("message", onMsg);
+        reject(new Error("clipboard timed out"));
+      }, 2500);
+    });
+  }
+
+  function copyAddress(text, kind) {
+    if (!text) return;
+    var label = C ? C.toastLabel(kind) : (kind === "burner" || kind === "local-burner" ? "copied local burner" : "copied");
+    var native = function (value) { return parentCopy(value); };
+    var run = C && C.copyText
+      ? C.copyText(text, native).catch(function () { return C.copyText(text); })
+      : parentCopy(text);
+    run.then(function () { showToast(label); }).catch(function () {});
+  }
+
+  function setAddrEl(id, addr, kind) {
+    var el = $(id);
+    if (!el) return;
+    el.textContent = addr || "not connected";
+    el.setAttribute("data-address", addr || "");
+    el.setAttribute("data-copy-kind", kind || "phantom");
+  }
+
+  function wireCopyable(el) {
+    if (!el || el.getAttribute("data-copy-wired")) return;
+    el.setAttribute("data-copy-wired", "1");
+    function go() {
+      var addr = el.getAttribute("data-address");
+      if (!addr) return;
+      var sel = window.getSelection && String(window.getSelection()).trim();
+      copyAddress(sel && addr.indexOf(sel) !== -1 && sel.length >= 8 ? sel : addr, el.getAttribute("data-copy-kind"));
+    }
+    el.addEventListener("click", go);
+    el.addEventListener("mouseup", function () {
+      var sel = window.getSelection && String(window.getSelection()).trim();
+      var addr = el.getAttribute("data-address");
+      if (sel && addr && addr.indexOf(sel) !== -1) copyAddress(sel, el.getAttribute("data-copy-kind"));
+    });
   }
 
   function uiAmount(raw, decimals) {
@@ -234,8 +326,8 @@
   function openSettings() {
     $("settingsOverlay").classList.add("show");
     $("planBody").textContent = planLabel();
-    var addr = P.getAddress();
-    $("walletBody").textContent = addr ? ("Phantom " + shortAddr(addr)) : "not connected";
+    setAddrEl("walletAddr", P.getAddress(), "phantom");
+    setAddrEl("walletDetail", P.getAddress(), "phantom");
   }
 
   function postBind(corpus, contextId) {
@@ -274,7 +366,7 @@
       setStatus(B.userVisibleStatus(t.items, true));
       return t.ctx;
     }).catch(function (e) {
-      setStatus("could not attach: " + ((e && e.message) || e));
+      setStatus(R.looksNetworkGarbage(e) ? R.friendlyNetworkMessage() : ("could not attach: " + ((e && e.message) || e)));
       return null;
     });
   }
@@ -387,7 +479,24 @@
         thinking.textContent = e.copy && e.copy.body ? e.copy.body : "Need funds in Phantom.";
         return;
       }
-      thinking.textContent = "the zoo hiccuped: " + ((e && e.message) || e);
+      if (e && e.name === "WrapCanceledError") {
+        thinking.textContent = "Wrap canceled.";
+        return;
+      }
+      if (e && e.name === "ConnectWalletError") {
+        thinking.textContent = e.message;
+        P.requestWalletConnect();
+        return;
+      }
+      if (e && e.name === "PaymentPausedError") {
+        pausedThinking = { el: thinking, thread: t };
+        thinking.textContent = e.message;
+        return;
+      }
+      thinking.textContent = R.looksNetworkGarbage(e)
+        ? R.friendlyNetworkMessage()
+        : ("the zoo hiccuped: " + ((e && e.message) || e));
+      if (R.looksNetworkGarbage(e)) pausedThinking = { el: thinking, thread: t };
     }).then(function () {
       busy = false;
     });
@@ -415,6 +524,7 @@
   }
 
   $("newBtn").onclick = function () { newThread(); };
+  if ($("headerNewBtn")) $("headerNewBtn").onclick = function () { newThread(); };
   $("menuBtn").onclick = function () {
     $("sidebar").classList.add("open");
     $("scrim").classList.add("show");
@@ -473,6 +583,7 @@
   $("walletClose").onclick = function () { $("walletOverlay").classList.remove("show"); };
   $("leaveBtn").onclick = function () { P.disconnectWallet(); };
   $("fundsClose").onclick = function () { $("fundsOverlay").classList.remove("show"); };
+  if (P.setWrapPrompt) P.setWrapPrompt(showWrapPrompt);
   $("send").onclick = send;
   $("inp").addEventListener("input", refreshSend);
   $("inp").addEventListener("keydown", function (e) {
@@ -488,12 +599,56 @@
 
   window.addEventListener("openzoo-wallet", function (e) {
     var addr = e.detail && e.detail.address;
-    if ($("walletBody")) $("walletBody").textContent = addr ? ("Phantom " + shortAddr(addr)) : "not connected";
+    setAddrEl("walletAddr", addr, "phantom");
+    setAddrEl("walletDetail", addr, "phantom");
     if (!addr && $("walletOverlay")) $("walletOverlay").classList.remove("show");
   });
   window.addEventListener("openzoo-billing", function () {
     if ($("planBody")) $("planBody").textContent = planLabel();
   });
+  window.addEventListener("openzoo-402-retry", function () {
+    if (resumeBusy) return;
+    var slot = pausedThinking;
+    if (!slot || !P.resumePending402) return;
+    resumeBusy = true;
+    setStatus("retrying…");
+    P.resumePending402().then(function (r) {
+      if (!r) return null;
+      return r.json();
+    }).then(function (d) {
+      if (!d) return;
+      var ch = d.choices && d.choices[0];
+      var content = (ch && ch.message && ch.message.content) || "";
+      if (!content) content = (d.error && d.error.message) || "unusual reply";
+      if (R.looksNetworkGarbage(content)) content = R.friendlyNetworkMessage();
+      slot.el.textContent = content;
+      if (slot.thread) {
+        slot.thread.messages.push({ role: "assistant", content: content });
+        persist();
+      }
+      pausedThinking = null;
+      setStatus("");
+    }).catch(function (e) {
+      if (e && e.name === "PaymentPausedError") {
+        slot.el.textContent = e.message;
+        return;
+      }
+      if (R.looksNetworkGarbage(e)) {
+        slot.el.textContent = R.friendlyNetworkMessage();
+        return;
+      }
+      slot.el.textContent = (e && e.message) || "retry failed";
+      if (R.looksNetworkGarbage(slot.el.textContent)) {
+        slot.el.textContent = R.friendlyNetworkMessage();
+      }
+    }).then(function () {
+      resumeBusy = false;
+    });
+  });
+
+  wireCopyable($("walletAddr"));
+  wireCopyable($("walletDetail"));
+  wireCopyable($("fundsAddr"));
 
   if (!threads.length) newThread();
   else {

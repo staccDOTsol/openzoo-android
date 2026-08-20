@@ -68,6 +68,9 @@ public class MWAPlugin extends CordovaPlugin {
         LocalAssociationScenario scenario = new LocalAssociationScenario(SCENARIO_TIMEOUT_MS);
         Log.d(TAG, "Scenario created on port " + scenario.getPort());
 
+        // Play / Phantom payment path is MWA only. Do not open the
+        // HTTPS Phantom /ul/ browse link in a WebView. If a custom-scheme
+        // deeplink is ever added, it must be phantom://v1/<method>.
         Intent intent = LocalAssociationIntentCreator.createAssociationIntent(
             null, scenario.getPort(), scenario.getSession()
         );

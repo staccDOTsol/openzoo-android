@@ -8,6 +8,9 @@
   var walletPayEnabled = false;
   var billing = { key: null, tier: null, pending: false };
   var signWaiters = {};
+  var wrapPromptFn = null;
+  var currentPaidPath = "";
+  var currentPaidOptions = {};
 
   function setAddress(addr) {
     walletAddress = addr || null;
@@ -79,12 +82,14 @@
     }
     if (data.type === "wallet-connected") {
       setAddress(data.address);
+      walletPayEnabled = true;
       root.dispatchEvent(new CustomEvent("openzoo-wallet", {
         detail: { address: data.address, method: data.method },
       }));
     }
     if (data.type === "wallet-disconnected") {
       setAddress(null);
+      walletPayEnabled = false;
       root.dispatchEvent(new CustomEvent("openzoo-wallet", { detail: { address: null } }));
     }
     if (data.type === "wallet-sign-transaction-response" ||
@@ -138,6 +143,31 @@
   }
   FundsError.prototype = Object.create(Error.prototype);
   FundsError.prototype.constructor = FundsError;
+
+  function WrapCanceledError() {
+    this.name = "WrapCanceledError";
+    this.message = "Wrap canceled";
+  }
+  WrapCanceledError.prototype = Object.create(Error.prototype);
+  WrapCanceledError.prototype.constructor = WrapCanceledError;
+
+  function ConnectWalletError(message) {
+    this.name = "ConnectWalletError";
+    this.message = message || "Connect Phantom to wrap TOKEN and send.";
+  }
+  ConnectWalletError.prototype = Object.create(Error.prototype);
+  ConnectWalletError.prototype.constructor = ConnectWalletError;
+
+  function setWrapPrompt(fn) {
+    wrapPromptFn = fn;
+  }
+
+  function confirmWrap(decision) {
+    var pending = R.loadPending402 && R.loadPending402();
+    if (pending && pending.wrapConfirmed) return Promise.resolve(true);
+    if (!wrapPromptFn) return Promise.resolve(true);
+    return Promise.resolve(wrapPromptFn(R.wrapPromptCopy(decision)));
+  }
 
   function mintRawBalance(owner, mint) {
     return rpc("getTokenAccountsByOwner", [
@@ -301,6 +331,7 @@
                   return u;
                 })()),
                 empty: BigInt(pair[2] || "0") === 0n,
+                address: owner,
               }));
             }
             if (onStage) onStage("topup");
@@ -312,7 +343,7 @@
                 return confirmSignature(sig);
               }).catch(function (e) {
                 if (R.looksNoSol(e && e.message) || /lamports|blockhash|fee/i.test(e && e.message || "")) {
-                  throw new FundsError(R.wrapSolCopy());
+                  throw new FundsError(R.wrapSolCopy(owner));
                 }
                 throw e;
               });
@@ -366,6 +397,7 @@
               throw new FundsError(R.fundsCopy({
                 heldUnderlying: R.heldPlainNames(balances.underlyings),
                 empty: R.heldPlainNames(balances.underlyings).length === 0,
+                address: payer,
               }));
             }
             throw e;
@@ -373,24 +405,32 @@
         }
 
         if (decision.mode === "need-funds") {
-          throw new FundsError(R.fundsCopy(decision));
+          throw new FundsError(R.fundsCopy(Object.assign({}, decision, { address: payer })));
         }
         if (decision.mode === "pay") {
           return afterReady(decision.accept);
         }
         if (decision.mode === "wrap") {
-          return topUpQuotedAsset(
-            decision.accept,
-            kinds,
-            payer,
-            decision.accept.maxAmountRequired,
-            onStage
-          ).then(function () { return afterReady(decision.accept); });
+          return confirmWrap(decision).then(function (ok) {
+            if (!ok) throw new WrapCanceledError();
+            pauseForWallet(currentPaidPath, currentPaidOptions, {
+              challenge: challengeJson,
+              payer: payer,
+              wrapConfirmed: true,
+            });
+            return topUpQuotedAsset(
+              decision.accept,
+              kinds,
+              payer,
+              decision.accept.maxAmountRequired,
+              onStage
+            ).then(function () { return afterReady(decision.accept); });
+          });
         }
         var order = decision.order || [];
         var i = 0;
         function next() {
-          if (i >= order.length) throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
+          if (i >= order.length) throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true, address: payer }));
           var row = order[i++];
           return tryPayRow(row.accept, payer).catch(function (e) {
             if (R.looksUnderfunded(e && e.message)) return next();
@@ -431,8 +471,38 @@
   SubscriptionRequiredError.prototype = Object.create(Error.prototype);
   SubscriptionRequiredError.prototype.constructor = SubscriptionRequiredError;
 
+  function PaymentPausedError(message) {
+    this.name = "PaymentPausedError";
+    this.message = message || R.friendlyNetworkMessage();
+  }
+  PaymentPausedError.prototype = Object.create(Error.prototype);
+  PaymentPausedError.prototype.constructor = PaymentPausedError;
+
+  function pauseForWallet(path, options, extra) {
+    R.savePending402(Object.assign({
+      path: path,
+      at: Date.now(),
+      payer: walletAddress,
+    }, R.persistableOptions(options), extra || {}));
+  }
+
+  function wrapNetwork(err, path, options) {
+    if (err && (err.name === "FundsError" || err.name === "SubscriptionRequiredError" ||
+        err.name === "ContextNotFoundError" || err.name === "PaymentPausedError" ||
+        err.name === "WrapCanceledError" || err.name === "ConnectWalletError")) {
+      throw err;
+    }
+    if (R.looksNetworkGarbage(err)) {
+      pauseForWallet(path, options, { reason: "network" });
+      throw new PaymentPausedError();
+    }
+    throw err;
+  }
+
   function paidFetch(path, options) {
     options = options || {};
+    currentPaidPath = path;
+    currentPaidOptions = options;
     var payer = walletAddress;
     var headers = Object.assign(R.gatewayHeaders(), options.headers || {});
 
@@ -453,14 +523,15 @@
         });
       }
       if (res.status !== 402) return res;
-      if (!walletPayEnabled || !payer) {
-        throw new SubscriptionRequiredError(
+      if (!payer) {
+        throw new ConnectWalletError(
           billing.key
-            ? "This call still asked for payment. Restore purchases if your plan is active."
-            : "Subscribe with Google Play. This app does not open Stripe or charge x402 first."
+            ? "This call still asked for payment. Connect Phantom to wrap TOKEN and send, or restore purchases."
+            : "Connect Phantom to wrap TOKEN and send, or subscribe with Google Play."
         );
       }
       return readBody(res).then(function (challenge) {
+        pauseForWallet(path, options, { challenge: challenge.json || {}, payer: payer });
         return paymentHeaderFor(challenge.json || {}, payer, options.onStage).then(function (header) {
           var retryHeaders = Object.assign({}, headers, { "X-PAYMENT": header });
           return fetch(R.GATEWAY + path, {
@@ -468,11 +539,15 @@
             headers: retryHeaders,
             body: options.body,
           }).then(function (retry) {
-            if (retry.ok) return retry;
+            if (retry.ok) {
+              R.clearPending402();
+              return retry;
+            }
             return readBody(retry).then(function (failed) {
               var msg = errText((failed.json && (failed.json.error || failed.json.message)) || failed.raw || ("HTTP " + retry.status));
+              if (R.looksNetworkGarbage(msg)) throw new PaymentPausedError();
               if (R.looksUnderfunded(msg)) {
-                throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
+                throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true, address: payer }));
               }
               var err = new Error(msg);
               err.status = retry.status;
@@ -482,7 +557,39 @@
           });
         });
       });
+    }).catch(function (e) {
+      wrapNetwork(e, path, options);
     });
+  }
+
+  function resumePending402() {
+    var job = R.loadPending402();
+    if (!job || !job.path) return Promise.resolve(null);
+    return paidFetch(job.path, {
+      method: job.method,
+      headers: job.headers || {},
+      body: job.body,
+    });
+  }
+
+  function onAppResume() {
+    var job = R.loadPending402();
+    if (!job) return;
+    root.dispatchEvent(new CustomEvent("openzoo-402-retry", { detail: job }));
+  }
+
+  root.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || !data.type) return;
+    if (data.type === "app-resume" || data.type === "app-pause") {
+      if (data.type === "app-resume") onAppResume();
+    }
+  });
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") onAppResume();
+    });
+    document.addEventListener("resume", onAppResume, false);
   }
 
   function holdingsForWallet() {
@@ -508,15 +615,20 @@
     disconnectWallet: disconnectWallet,
     signOutBilling: signOutBilling,
     setWalletPayEnabled: setWalletPayEnabled,
+    setWrapPrompt: setWrapPrompt,
     getBilling: getBilling,
     signTransaction: signTransaction,
     signAndSendTransaction: signAndSendTransaction,
     probeBalances: probeBalances,
     loadDirectory: loadDirectory,
     paidFetch: paidFetch,
+    resumePending402: resumePending402,
     holdingsForWallet: holdingsForWallet,
     FundsError: FundsError,
     ContextNotFoundError: ContextNotFoundError,
     SubscriptionRequiredError: SubscriptionRequiredError,
+    PaymentPausedError: PaymentPausedError,
+    WrapCanceledError: WrapCanceledError,
+    ConnectWalletError: ConnectWalletError,
   };
 })(typeof window !== "undefined" ? window : globalThis);

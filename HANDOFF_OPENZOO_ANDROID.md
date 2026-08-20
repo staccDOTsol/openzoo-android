@@ -95,6 +95,7 @@ www/app/js/bind.js                  abstract attach → corpus
 www/app/js/pay.js                   subscription-first paidFetch; optional 402
 www/app/js/solana-lite.js           ATA / PDA / legacy tx (no @solana/web3.js)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
+cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
 cordova-plugin-mwa/                 Java: authorize, signMessage, signTransaction,
                                     signAndSendTransaction (Settings later)
 config.xml                          widget id fun.openzoo.android
@@ -106,3 +107,21 @@ and is the only MWA sign API for 402 payment.
 `MWA.signAndSendTransaction` is wrap / top-up only.
 
 Keep the existing split: the shell owns Play + wallet; the UI never sees a key.
+
+Address copy is select-to-copy / tap-to-copy with a **copied** toast (burner
+copy says **copied local burner**). The clipboard path is Android
+`ClipboardManager` (`cordova-plugin-openzoo-clipboard`), not
+`navigator.clipboard`.
+
+x402 must not surface WebView **Load failed** / `net::ERR_*`. Persist the 402
+across the MWA backgrounding round-trip and retry on `resume`. CSP
+`connect-src` must list the gateway and RPCs actually called.
+
+`pickLargestUseful` gates wrap on held TOKEN/USDC/LEOS `> 0` (and
+`depositForShares` when reserves are known). It must **not** compare
+underlying raw to twin `maxAmountRequired`. Prompt **Wrap TOKEN to send
+this?** then `MWA.signAndSend` wrap, confirm, pay. Short SOL or tokens
+shows a copyable address + toast. Header has **New chat**.
+
+Never open the HTTPS Phantom `/ul/` browse link. Custom scheme, if used, is
+`phantom://v1/<method>`. MWA stays the Play/Phantom payment path.
