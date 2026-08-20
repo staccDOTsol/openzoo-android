@@ -1,0 +1,11 @@
+{
+  "name": "cordova-plugin-play-billing",
+  "version": "1.0.0",
+  "description": "Google Play Billing for OpenZoo Android monthly subscriptions",
+  "cordova": {
+    "id": "cordova-plugin-play-billing",
+    "platforms": ["android"]
+  },
+  "keywords": ["ecosystem:cordova", "cordova-android", "play-billing"],
+  "license": "MIT"
+}

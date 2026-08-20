@@ -5,6 +5,8 @@
   var W = root.OpenZooWrap;
   var S = root.OpenZooSolana;
   var walletAddress = null;
+  var walletPayEnabled = false;
+  var billing = { key: null, tier: null, pending: false };
   var signWaiters = {};
 
   function setAddress(addr) {
@@ -66,6 +68,15 @@
   root.addEventListener("message", function (event) {
     var data = event.data;
     if (!data || !data.type) return;
+    if (data.type === "billing-ready") {
+      billing = {
+        key: data.key || null,
+        tier: data.tier || null,
+        pending: !!data.pending && !data.key,
+      };
+      if (typeof R.setSubscriptionKey === "function") R.setSubscriptionKey(billing.key);
+      root.dispatchEvent(new CustomEvent("openzoo-billing", { detail: billing }));
+    }
     if (data.type === "wallet-connected") {
       setAddress(data.address);
       root.dispatchEvent(new CustomEvent("openzoo-wallet", {
@@ -391,10 +402,38 @@
     });
   }
 
+  function requestWalletConnect() {
+    if (root.parent && root.parent !== root) {
+      root.parent.postMessage({ type: "wallet-connect-request" }, "*");
+    }
+  }
+
+  function signOutBilling() {
+    billing = { key: null, tier: null, pending: false };
+    if (typeof R.setSubscriptionKey === "function") R.setSubscriptionKey(null);
+    if (root.parent && root.parent !== root) {
+      root.parent.postMessage({ type: "billing-sign-out" }, "*");
+    }
+  }
+
+  function setWalletPayEnabled(on) {
+    walletPayEnabled = !!on;
+  }
+
+  function getBilling() {
+    return billing;
+  }
+
+  function SubscriptionRequiredError(message) {
+    this.name = "SubscriptionRequiredError";
+    this.message = message || "Subscribe with Google Play to use this app.";
+  }
+  SubscriptionRequiredError.prototype = Object.create(Error.prototype);
+  SubscriptionRequiredError.prototype.constructor = SubscriptionRequiredError;
+
   function paidFetch(path, options) {
     options = options || {};
     var payer = walletAddress;
-    if (!payer) return Promise.reject(new Error("Connect a Phantom wallet first"));
     var headers = Object.assign(R.gatewayHeaders(), options.headers || {});
 
     return fetch(R.GATEWAY + path, {
@@ -414,6 +453,13 @@
         });
       }
       if (res.status !== 402) return res;
+      if (!walletPayEnabled || !payer) {
+        throw new SubscriptionRequiredError(
+          billing.key
+            ? "This call still asked for payment. Restore purchases if your plan is active."
+            : "Subscribe with Google Play. This app does not open Stripe or charge x402 first."
+        );
+      }
       return readBody(res).then(function (challenge) {
         return paymentHeaderFor(challenge.json || {}, payer, options.onStage).then(function (header) {
           var retryHeaders = Object.assign({}, headers, { "X-PAYMENT": header });
@@ -458,7 +504,11 @@
     setAddress: setAddress,
     getAddress: getAddress,
     requestWalletInfo: requestWalletInfo,
+    requestWalletConnect: requestWalletConnect,
     disconnectWallet: disconnectWallet,
+    signOutBilling: signOutBilling,
+    setWalletPayEnabled: setWalletPayEnabled,
+    getBilling: getBilling,
     signTransaction: signTransaction,
     signAndSendTransaction: signAndSendTransaction,
     probeBalances: probeBalances,
@@ -467,5 +517,6 @@
     holdingsForWallet: holdingsForWallet,
     FundsError: FundsError,
     ContextNotFoundError: ContextNotFoundError,
+    SubscriptionRequiredError: SubscriptionRequiredError,
   };
 })(typeof window !== "undefined" ? window : globalThis);

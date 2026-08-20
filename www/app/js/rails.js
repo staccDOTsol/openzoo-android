@@ -37,6 +37,16 @@
   ];
 
   var directoryCache = { at: 0, kinds: null };
+  var subscriptionKey = null;
+
+  function setSubscriptionKey(key) {
+    subscriptionKey = key || null;
+    return subscriptionKey;
+  }
+
+  function getSubscriptionKey() {
+    return subscriptionKey;
+  }
 
   function asBigInt(v) {
     try { return BigInt(String(v == null ? "0" : v)); }
@@ -243,7 +253,7 @@
   function gatewayHeaders(extra) {
     return Object.assign({
       "content-type": "application/json",
-      authorization: "Bearer openzoo",
+      authorization: "Bearer " + (subscriptionKey || "openzoo"),
       "x-openzoo-namespace": NAMESPACE,
     }, extra || {});
   }
@@ -350,6 +360,8 @@
     setDirectory: setDirectory,
     getCachedDirectory: getCachedDirectory,
     parseSupported: parseSupported,
+    setSubscriptionKey: setSubscriptionKey,
+    getSubscriptionKey: getSubscriptionKey,
     kindAsset: kindAsset,
     kindSymbol: kindSymbol,
   };
