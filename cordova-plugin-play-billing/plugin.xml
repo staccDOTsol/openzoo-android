@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="cordova-plugin-play-billing"
+        version="1.0.0">
+    <name>Play Billing Plugin</name>
+    <description>Google Play Billing Library for OpenZoo monthly subscriptions (fun.openzoo.android.sub.basic / .pro / .ultra)</description>
+
+    <js-module src="www/playbilling.js" name="PlayBilling">
+        <clobbers target="PlayBilling" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="PlayBillingPlugin">
+                <param name="android-package" value="fun.openzoo.android.PlayBillingPlugin" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="com.android.vending.BILLING" />
+        </config-file>
+
+        <source-file src="src/android/PlayBillingPlugin.java"
+                     target-dir="src/fun/openzoo/android" />
+
+        <framework src="com.android.billingclient:billing:6.2.1" />
+    </platform>
+</plugin>

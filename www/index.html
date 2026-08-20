@@ -5,143 +5,110 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com https: wss: ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com https: wss: ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
   <title>OpenZoo</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0a0a18; }
+    html, body { width: 100%; height: 100%; background: #000; }
     body {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; min-height: 100vh;
-      font-family: ui-sans-serif, system-ui, sans-serif; color: #fff;
-      padding: 40px 20px 60px;
-      -webkit-user-select: none; user-select: none;
-      -webkit-tap-highlight-color: transparent;
+      min-height: 100vh; color: #ececec;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      padding: 28px 16px 72px;
+      padding-top: max(28px, env(safe-area-inset-top));
       overflow-y: auto;
     }
-
-    .logo {
-      width: 120px; height: 120px; border-radius: 28px;
-      margin-bottom: 16px; overflow: hidden;
-      background: #123;
-      border: 1px solid rgba(100,140,255,0.2);
-      box-shadow: 0 0 40px rgba(60,120,255,0.25);
-    }
+    .logo { width: 72px; height: 72px; border-radius: 18px; overflow: hidden; margin-bottom: 12px; background: #123; }
     .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .title {
-      font-size: 28px; font-weight: 700; letter-spacing: 4px;
-      color: #e0e8ff;
+    .tag { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #b8f240; margin-bottom: 8px; }
+    .title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+    .sub { margin-top: 8px; font-size: 14px; color: #8e8e93; text-align: center; max-width: 340px; line-height: 1.45; }
+    #tiers { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
+    .tier {
+      text-align: left; background: #111113; border: 1px solid #2c2c2e; border-radius: 16px;
+      padding: 16px; color: inherit; font: inherit; cursor: pointer;
     }
-    .sub {
-      margin-top: 8px; font-size: 13px; color: rgba(255,255,255,0.45);
-      text-align: center; max-width: 300px; line-height: 1.45;
+    .tier.pro { border-color: #b8f240; background: rgba(184,242,64,.06); }
+    .tier:disabled { opacity: .45; pointer-events: none; }
+    .thigh { font-size: 11px; color: #b8f240; letter-spacing: .04em; text-transform: uppercase; min-height: 16px; }
+    .tname { font-size: 20px; font-weight: 700; margin-top: 2px; }
+    .tprice { font-size: 15px; color: #ececec; margin-top: 2px; }
+    .tblurb { font-size: 13px; color: #8e8e93; margin-top: 6px; }
+    .tmeta { font-size: 12px; color: #8e8e93; margin-top: 8px; line-height: 1.45; }
+    #restore {
+      margin-top: 16px; background: none; border: 1px solid #2c2c2e; color: #ececec;
+      border-radius: 12px; padding: 10px 16px; font: inherit;
     }
-    .divider {
-      width: 60px; height: 1px; margin: 16px 0 20px;
-      background: linear-gradient(90deg, transparent, rgba(100,140,255,0.4), transparent);
-    }
-
-    #picker {
-      display: flex; flex-direction: column; gap: 14px;
-      width: 100%; max-width: 300px;
-    }
-    .btn {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      color: #fff; padding: 16px 20px;
-      font-family: inherit; font-size: 14px;
-      letter-spacing: 1px; border-radius: 10px;
-      cursor: pointer; text-align: center;
-    }
-    .btn:active { background: rgba(255,255,255,0.08); transform: scale(0.97); }
-    .btn:disabled { opacity: 0.3; pointer-events: none; }
-    .btn.primary {
-      border-color: rgba(100,140,255,0.35);
-      background: linear-gradient(180deg, rgba(60,90,200,0.10) 0%, rgba(40,60,140,0.05) 100%);
-    }
-
-    #status {
-      margin-top: 16px; font-size: 12px;
-      color: rgba(255,255,255,0.35); text-align: center;
-      max-width: 300px; word-break: break-all; min-height: 18px;
-    }
-    .powered {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      text-align: center; padding: 14px;
-      font-size: 10px; letter-spacing: 1px;
-      color: rgba(255,255,255,0.35);
-    }
+    #status { margin-top: 14px; font-size: 12px; color: #8e8e93; text-align: center; max-width: 360px; min-height: 18px; }
+    .powered { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 14px;
+               font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
-  <div class="logo" data-component="logo">
-    <img src="img/token.jpg" alt="OpenZoo">
-  </div>
-  <div class="title" data-component="title">OPENZOO</div>
-  <p class="sub">Threads, chat, and wallet — same product as grokui, on your phone. Each call is paid from Phantom via Mobile Wallet Adapter.</p>
-  <div class="divider"></div>
+  <div class="logo"><img src="img/token.jpg" alt="OpenZoo"></div>
+  <div class="tag" id="tagline">Subscription keys · no x402</div>
+  <div class="title">openzoo</div>
+  <p class="sub">Pick a plan. Google Play Billing checkout — not Stripe, not a wallet. Usage invoices at $1.00.</p>
 
-  <div id="picker" data-component="wallet-picker">
-    <button class="btn primary" onclick="connectMWA()" data-testid="connect-wallet">
-      CONNECT PHANTOM
+  <div id="tiers" data-component="play-paywall">
+    <button type="button" class="tier" data-tier="basic" data-product="fun.openzoo.android.sub.basic">
+      <div class="thigh">&nbsp;</div>
+      <div class="tname">Basic</div>
+      <div class="tprice">$9/mo</div>
+      <div class="tblurb">One vault, one machine.</div>
+      <div class="tmeta">40% savings share · 60 rpm · bind 32MB · top-k 32</div>
+    </button>
+    <button type="button" class="tier pro" data-tier="pro" data-product="fun.openzoo.android.sub.pro">
+      <div class="thigh">Most teams want this</div>
+      <div class="tname">Pro</div>
+      <div class="tprice">$29/mo</div>
+      <div class="tblurb">A whole archive, and the breadth to actually read it.</div>
+      <div class="tmeta">20% savings share · 300 rpm · bind 512MB · top-k 128</div>
+    </button>
+    <button type="button" class="tier" data-tier="ultra" data-product="fun.openzoo.android.sub.ultra">
+      <div class="thigh">&nbsp;</div>
+      <div class="tname">Ultra</div>
+      <div class="tprice">$99/mo</div>
+      <div class="tblurb">Agents, fleets, and corpora that do not fit anywhere else.</div>
+      <div class="tmeta">10% savings share · 2000 rpm · bind ~8GB · top-k 256</div>
     </button>
   </div>
-
-  <div id="status" data-component="status"></div>
-  <div class="powered">fun.openzoo.android · Play Store / Phantom MWA</div>
+  <button id="restore" type="button">Restore purchases</button>
+  <div id="status"></div>
+  <div class="powered">fun.openzoo.android · Google Play Billing</div>
 
   <script src="cordova.js"></script>
+  <script src="js/billing.js"></script>
   <script>
   'use strict';
 
-  var connectedAddress = null;
-  var connectedMethod  = null;
-  var GAME_URL    = 'app/index.html';
+  var B = window.OpenZooBilling;
+  var GAME_URL = 'app/index.html';
   var GAME_ORIGIN = '*';
+  var connectedAddress = null;
+  var connectedMethod = null;
+  var billingState = B.readStore();
+  var busy = false;
 
-  var $picker    = document.getElementById('picker');
-  var $status    = document.getElementById('status');
+  var $tiers = document.getElementById('tiers');
+  var $status = document.getElementById('status');
+  var $restore = document.getElementById('restore');
+  var $tag = document.getElementById('tagline');
 
-  function log(msg) {
-    console.log('[wallet-shell] ' + msg);
-  }
-
-  function setStatus(msg) { $status.textContent = msg; }
-
-  function isAllowedExternal(url) {
-    try {
-      var u = new URL(url);
-      return u.protocol === 'https:' &&
-        u.hostname === 'x402.accrue.fund' &&
-        (u.pathname === '/start' || u.pathname === '/start/');
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function openExternal(url) {
-    if (!isAllowedExternal(url)) {
-      log('Blocked external url: ' + url);
-      return;
-    }
-    if (window.navigator && navigator.app && typeof navigator.app.loadUrl === 'function') {
-      navigator.app.loadUrl(url, { openExternal: true });
-      return;
-    }
-    var a = document.createElement('a');
-    a.href = url;
-    a.target = '_system';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
+  function log(msg) { console.log('[play-shell] ' + msg); }
+  function setStatus(msg) { $status.textContent = msg || ''; }
 
   function launchApp() {
-    $picker.style.display = 'none';
-
     var old = document.getElementById('game');
     if (old) old.remove();
+    document.querySelector('.logo').style.display = 'none';
+    document.querySelector('.title').style.display = 'none';
+    document.querySelector('.sub').style.display = 'none';
+    $tag.style.display = 'none';
+    $tiers.style.display = 'none';
+    $restore.style.display = 'none';
+    $status.style.display = 'none';
+    document.querySelector('.powered').style.display = 'none';
 
     var iframe = document.createElement('iframe');
     iframe.id = 'game';
@@ -149,163 +116,316 @@
     iframe.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;border:none;z-index:9999;';
     document.body.appendChild(iframe);
 
-    if (connectedAddress) {
-      var sendWalletInfo = function() {
+    function sendReady() {
+      iframe.contentWindow.postMessage({
+        type: 'billing-ready',
+        key: billingState.key || null,
+        tier: billingState.tier || null,
+        pending: !billingState.key,
+        purchase: billingState.purchase || null,
+      }, GAME_ORIGIN);
+      if (connectedAddress) {
         iframe.contentWindow.postMessage({
           type: 'wallet-connected',
           address: connectedAddress,
-          method: connectedMethod
+          method: connectedMethod,
         }, GAME_ORIGIN);
-        log('Sent wallet-connected to iframe');
-      };
-
-      iframe.addEventListener('load', function onLoad() {
-        iframe.removeEventListener('load', onLoad);
-        setTimeout(sendWalletInfo, 400);
-      });
+      }
     }
-
+    iframe.addEventListener('load', function onLoad() {
+      iframe.removeEventListener('load', onLoad);
+      setTimeout(sendReady, 300);
+    });
     iframe.src = GAME_URL;
-    log('Loading OpenZoo iframe...');
+    log('Loading grokui iframe after Play entitlement');
   }
 
-  function disconnect() {
+  function showPaywall() {
+    document.querySelector('.logo').style.display = '';
+    document.querySelector('.title').style.display = '';
+    document.querySelector('.sub').style.display = '';
+    $tag.style.display = '';
+    $tiers.style.display = 'flex';
+    $restore.style.display = '';
+    $status.style.display = '';
+    document.querySelector('.powered').style.display = '';
     var iframe = document.getElementById('game');
-    if (iframe && connectedAddress) {
-      try {
-        iframe.contentWindow.postMessage({ type: 'wallet-disconnected' }, GAME_ORIGIN);
-      } catch (_) {}
-    }
     if (iframe) iframe.remove();
-
-    $picker.style.display = 'flex';
-    connectedAddress = null;
-    connectedMethod  = null;
-    setStatus('');
-    log('Disconnected');
   }
+
+  function persistBilling(next) {
+    billingState = B.writeStore(next);
+    return billingState;
+  }
+
+  function applyExchange(ex, purchase) {
+    var next = {
+      key: ex.key || null,
+      tier: purchase.tier || B.tierFromProductId(purchase.productId),
+      purchase: {
+        productId: purchase.productId,
+        purchaseToken: purchase.purchaseToken,
+        orderId: purchase.orderId || '',
+        tier: purchase.tier || B.tierFromProductId(purchase.productId),
+      },
+      stub: !!ex.stub,
+      todo: ex.todo || null,
+      updatedAt: Date.now(),
+    };
+    persistBilling(next);
+    if (ex.stub) {
+      log('TODO play exchange: ' + ex.todo);
+      setStatus('Purchase saved. Waiting on Play key exchange at /api/billing/play.');
+    }
+    launchApp();
+  }
+
+  function exchangeAndEnter(purchase) {
+    return B.exchangePlayPurchase(purchase).then(function (ex) {
+      applyExchange(ex, purchase);
+    });
+  }
+
+  function playPurchase(productId) {
+    return new Promise(function (resolve, reject) {
+      if (!window.PlayBilling) {
+        reject(new Error('Google Play Billing needs a Play Store install'));
+        return;
+      }
+      window.PlayBilling.purchase(productId, resolve, function (err) { reject(new Error(err)); });
+    });
+  }
+
+  function playRestore() {
+    return new Promise(function (resolve, reject) {
+      if (!window.PlayBilling) {
+        reject(new Error('Google Play Billing needs a Play Store install'));
+        return;
+      }
+      window.PlayBilling.restore(resolve, function (err) { reject(new Error(err)); });
+    });
+  }
+
+  function playAcknowledge(token) {
+    return new Promise(function (resolve, reject) {
+      if (!window.PlayBilling || !token) { resolve(); return; }
+      window.PlayBilling.acknowledge(token, resolve, function () { resolve(); });
+    });
+  }
+
+  function normalizePurchase(raw, fallbackProductId) {
+    if (!raw) return null;
+    var productId = raw.productId || fallbackProductId || (raw.productIds && raw.productIds[0]);
+    if (!raw.purchaseToken || !productId) return null;
+    return {
+      productId: productId,
+      purchaseToken: raw.purchaseToken,
+      orderId: raw.orderId || '',
+      tier: B.tierFromProductId(productId),
+    };
+  }
+
+  function subscribe(tierId) {
+    if (busy) return;
+    var productId = B.productIdFor(tierId);
+    if (!productId) return;
+    busy = true;
+    setBusy(true);
+    setStatus('Opening Google Play…');
+    playPurchase(productId).then(function (raw) {
+      var purchase = normalizePurchase(raw, productId);
+      if (!purchase) throw new Error('Play did not return a purchase token');
+      return playAcknowledge(purchase.purchaseToken).then(function () {
+        return exchangeAndEnter(purchase);
+      });
+    }).catch(function (e) {
+      var msg = (e && e.message) || String(e);
+      if (/cancel/i.test(msg)) setStatus('Purchase canceled');
+      else setStatus(msg);
+    }).then(function () {
+      busy = false;
+      setBusy(false);
+    });
+  }
+
+  function restore() {
+    if (busy) return;
+    busy = true;
+    setBusy(true);
+    setStatus('Restoring…');
+    playRestore().then(function (list) {
+      var rows = Array.isArray(list) ? list : [];
+      var first = null;
+      for (var i = 0; i < rows.length; i++) {
+        var p = normalizePurchase(rows[i]);
+        if (p) { first = p; break; }
+      }
+      if (!first) throw new Error('No Play subscription to restore');
+      return playAcknowledge(first.purchaseToken).then(function () {
+        return exchangeAndEnter(first);
+      });
+    }).catch(function (e) {
+      setStatus((e && e.message) || String(e));
+    }).then(function () {
+      busy = false;
+      setBusy(false);
+    });
+  }
+
+  function setBusy(on) {
+    var buttons = $tiers.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = !!on;
+    $restore.disabled = !!on;
+  }
+
+  function renderTiers(model) {
+    $tag.textContent = model.tagline || B.TAGLINE;
+    $tiers.innerHTML = '';
+    model.tiers.forEach(function (t) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tier' + (t.id === 'pro' ? ' pro' : '');
+      btn.setAttribute('data-tier', t.id);
+      btn.setAttribute('data-product', t.productId);
+      btn.innerHTML =
+        '<div class="thigh"></div>' +
+        '<div class="tname"></div>' +
+        '<div class="tprice"></div>' +
+        '<div class="tblurb"></div>' +
+        '<div class="tmeta"></div>';
+      btn.querySelector('.thigh').textContent = t.highlight || '\u00a0';
+      btn.querySelector('.tname').textContent = t.name;
+      btn.querySelector('.tprice').textContent = t.priceLabel;
+      btn.querySelector('.tblurb').textContent = t.blurb;
+      btn.querySelector('.tmeta').textContent =
+        t.savingsSharePct + '% savings share · ' + t.rpm + ' rpm · bind ' + t.bindLabel + ' · top-k ' + t.maxTopK;
+      $tiers.appendChild(btn);
+    });
+  }
+
+  $tiers.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-tier]');
+    if (btn) subscribe(btn.getAttribute('data-tier'));
+  });
+  $restore.onclick = restore;
 
   function connectMWA() {
     if (!window.MWA) {
-      log('MWA plugin not loaded');
-      setStatus('Wallet unavailable — needs a real phone with Phantom');
+      setStatus('Wallet is a Settings option — subscribe with Play first');
       return;
     }
-    setStatus('Opening Phantom…');
-    log('MWA: calling native authorize...');
-
-    MWA.authorize(
-      function(result) {
-        log('Authorized: ' + result.address.slice(0, 8) + '...');
+    window.MWA.authorize(
+      function (result) {
         connectedAddress = result.address;
-        connectedMethod  = 'MWA';
-        setStatus('');
-        launchApp();
+        connectedMethod = 'MWA';
+        var iframe = document.getElementById('game');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'wallet-connected',
+            address: connectedAddress,
+            method: connectedMethod,
+          }, GAME_ORIGIN);
+        }
       },
-      function(err) {
-        log('Connect failed: ' + err);
-        setStatus(err.replace(/^MWA[: ]+/i, ''));
-      }
+      function (err) { setStatus(String(err).replace(/^MWA[: ]+/i, '')); }
     );
   }
 
-  window.addEventListener('message', function(event) {
+  window.addEventListener('message', function (event) {
     var gameFrame = document.getElementById('game');
     if (!gameFrame || event.source !== gameFrame.contentWindow) return;
     var data = event.data;
     if (!data || !data.type) return;
 
-    if (data.type === 'wallet-disconnect') {
-      log('App requested disconnect');
-      disconnect();
+    if (data.type === 'billing-sign-out') {
+      persistBilling({});
+      showPaywall();
+      return;
     }
 
-    if (data.type === 'open-external-url') {
-      openExternal(data.url);
+    if (data.type === 'wallet-connect-request') {
+      connectMWA();
+      return;
+    }
+
+    if (data.type === 'wallet-disconnect') {
+      connectedAddress = null;
+      connectedMethod = null;
+      gameFrame.contentWindow.postMessage({ type: 'wallet-disconnected' }, GAME_ORIGIN);
     }
 
     if (data.type === 'wallet-request-info' && connectedAddress) {
       gameFrame.contentWindow.postMessage({
         type: 'wallet-connected',
         address: connectedAddress,
-        method: connectedMethod
+        method: connectedMethod,
       }, GAME_ORIGIN);
-      log('Re-sent wallet info to iframe');
     }
 
     if (data.type === 'wallet-sign-message') {
-      log('Sign request (message) — id:' + data.id);
-      var respondMsg = function(payload) {
+      var respondMsg = function (payload) {
         payload.type = 'wallet-sign-response';
         payload.id = data.id;
         gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
       };
       if (connectedMethod === 'MWA' && window.MWA) {
         var messageB64 = btoa(String.fromCharCode.apply(null, new TextEncoder().encode(data.message)));
-        MWA.signMessage(messageB64,
-          function(result) { log('Signed message (MWA)'); respondMsg({ signature: result.signature }); },
-          function(err)    { log('Sign failed: ' + err); respondMsg({ error: err }); }
+        window.MWA.signMessage(messageB64,
+          function (result) { respondMsg({ signature: result.signature }); },
+          function (err) { respondMsg({ error: err }); }
         );
-      } else {
-        respondMsg({ error: 'No wallet connected' });
-      }
+      } else respondMsg({ error: 'No wallet connected' });
     }
 
-    // Payment signer. MUST be signTransaction, never signAndSendTransaction:
-    // x402 needs a partial-signed tx so the gateway feePayer can complete it.
     if (data.type === 'wallet-sign-transaction') {
-      log('Sign request (transaction) — id:' + data.id);
-      var respondTx = function(payload) {
+      var respondTx = function (payload) {
         payload.type = 'wallet-sign-transaction-response';
         payload.id = data.id;
         gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
       };
       if (connectedMethod === 'MWA' && window.MWA) {
-        MWA.signTransaction(data.transaction,
-          function(result) {
-            log('Signed transaction (MWA)');
-            respondTx({ signedTransaction: result.signedTransaction });
-          },
-          function(err) {
-            log('Sign tx failed: ' + err);
-            respondTx({ error: err });
-          }
+        // Payment signer. MUST be signTransaction — facilitator stays the fee-payer.
+        window.MWA.signTransaction(data.transaction,
+          function (result) { respondTx({ signedTransaction: result.signedTransaction }); },
+          function (err) { respondTx({ error: err }); }
         );
-      } else {
-        respondTx({ error: 'No wallet connected' });
-      }
+      } else respondTx({ error: 'No wallet connected' });
     }
 
-    // Wrap / top-up only. The user is the fee-payer and the wallet may broadcast.
     if (data.type === 'wallet-sign-and-send-transaction') {
-      log('Sign-and-send request (wrap) — id:' + data.id);
-      var respondSend = function(payload) {
+      var respondSend = function (payload) {
         payload.type = 'wallet-sign-and-send-transaction-response';
         payload.id = data.id;
         gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
       };
       if (connectedMethod === 'MWA' && window.MWA) {
-        MWA.signAndSendTransaction(data.transaction,
-          function(result) {
-            log('Signed and sent wrap (MWA)');
-            respondSend({ signature: result.signature });
-          },
-          function(err) {
-            log('Sign-and-send failed: ' + err);
-            respondSend({ error: err });
-          }
+        // Wrap / top-up only — wallet may broadcast. Not the first-run path.
+        window.MWA.signAndSendTransaction(data.transaction,
+          function (result) { respondSend({ signature: result.signature }); },
+          function (err) { respondSend({ error: err }); }
         );
-      } else {
-        respondSend({ error: 'No wallet connected' });
-      }
+      } else respondSend({ error: 'No wallet connected' });
     }
   });
 
-  log('OpenZoo shell loaded');
+  function boot() {
+    B.loadTiers().then(function (model) {
+      renderTiers(model);
+      if (B.hasEntitlement(billingState)) {
+        launchApp();
+        return;
+      }
+      setStatus(model.trialDays ? '' : 'No free trial. Google Play checkout.');
+    });
+  }
 
-  document.addEventListener('deviceready', function() {
+  document.addEventListener('deviceready', function () {
     log('deviceready');
+    boot();
   }, false);
+
+  // Browser / unit environments still render the Play paywall, never Stripe or Phantom first.
+  if (!window.cordova) boot();
   </script>
 </body>
 </html>

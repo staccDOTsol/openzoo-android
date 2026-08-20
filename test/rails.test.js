@@ -234,6 +234,17 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
+check("first-run is Play paywall, not Phantom or Stripe", () => {
+  const shell = read("www/index.html");
+  assert.match(shell, /Subscription keys · no x402/);
+  assert.match(shell, /Most teams want this/);
+  assert.match(shell, /Restore purchases/);
+  assert.match(shell, /play-paywall/);
+  assert.doesNotMatch(shell, /CONNECT PHANTOM/);
+  assert.doesNotMatch(shell, /checkout\.stripe\.com/);
+  assert.doesNotMatch(shell, /\/api\/billing\/checkout/);
+});
+
 check("402 pay path partial-signs; wrap path may signAndSend", () => {
   const pay = read("www/app/js/pay.js");
   const shell = read("www/index.html");
