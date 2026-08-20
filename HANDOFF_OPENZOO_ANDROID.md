@@ -10,6 +10,10 @@ The generic Play Store product (chat + bind + stats, `fun.openzoo.android`,
 x402 via `MWA.signTransaction`) is implemented on this tree. Keep the facts
 below; do not re-import the stock clicker or reuse another OpenZoo widget id.
 
+Stay on this Cordova + MWA shell (FreeSolDev/CordovaSeeker lineage, already
+in-repo). Do **not** rewrite to Capacitor. Do **not** push to FreeSolDev —
+this product lives on `staccDOTsol/openzoo-android` only.
+
 ---
 
 ## Identity (must)

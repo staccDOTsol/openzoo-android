@@ -5,7 +5,8 @@ shipped via Google Play. Apache Cordova shell + native Mobile Wallet Adapter
 (`cordova-plugin-mwa`) for connect and **`signTransaction`**.
 
 This is **not** the Seeker dApp store (`fun.openzoo.seeker`) and **not** PSG1
-(`fun.openzoo.psg1`).
+(`fun.openzoo.psg1`). Stay on this Cordova + MWA tree — do not rewrite to
+Capacitor, and do not push to FreeSolDev.
 
 | | |
 |---|---|
