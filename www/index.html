@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src * https: wss: ws:; img-src * data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
+  <title>CordovaSeeker</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; }
+    body {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh;
+      font-family: monospace; color: #fff;
+      padding: 40px 20px 60px;
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      overflow-y: auto;
+    }
+
+    .logo {
+      width: 120px; height: 120px; border-radius: 20px;
+      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 64px;
+      background: rgba(100,140,255,0.08);
+      border: 1px solid rgba(100,140,255,0.2);
+      box-shadow: 0 0 40px rgba(60,120,255,0.25);
+    }
+    .title {
+      font-size: 28px; font-weight: bold; letter-spacing: 6px;
+      text-shadow: 0 0 30px rgba(100,140,255,0.4), 0 0 60px rgba(100,140,255,0.15);
+      color: #e0e8ff;
+    }
+    .divider {
+      width: 60px; height: 1px; margin: 16px 0 20px;
+      background: linear-gradient(90deg, transparent, rgba(100,140,255,0.4), transparent);
+    }
+
+    #picker {
+      display: flex; flex-direction: column; gap: 14px;
+      width: 100%; max-width: 300px;
+    }
+    .btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #fff; padding: 16px 20px;
+      font-family: monospace; font-size: 14px;
+      letter-spacing: 2px; border-radius: 10px;
+      cursor: pointer; text-align: center;
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
+    }
+    .btn:active { background: rgba(255,255,255,0.08); transform: scale(0.97); }
+    .btn:disabled { opacity: 0.3; pointer-events: none; }
+    .btn.primary {
+      border-color: rgba(100,140,255,0.35);
+      background: linear-gradient(180deg, rgba(60,90,200,0.10) 0%, rgba(40,60,140,0.05) 100%);
+    }
+    .btn.primary:active { background: rgba(80,120,255,0.12); }
+    .btn.danger {
+      border-color: rgba(255,80,80,0.2);
+      color: rgba(255,255,255,0.5); font-size: 12px; padding: 10px;
+    }
+
+    #status {
+      margin-top: 16px; font-size: 12px;
+      color: rgba(255,255,255,0.35); text-align: center;
+      max-width: 300px; word-break: break-all; min-height: 18px;
+    }
+    #connected {
+      display: none; text-align: center;
+      margin-top: 20px; width: 100%; max-width: 300px;
+    }
+    .lbl {
+      font-size: 10px; letter-spacing: 3px;
+      color: rgba(100,140,255,0.5); margin-bottom: 8px;
+    }
+    .addr {
+      font-size: 12px; color: #8aa8ff; word-break: break-all;
+      padding: 12px 14px; background: rgba(100,140,255,0.05);
+      border-radius: 8px; border: 1px solid rgba(112,144,255,0.12);
+      line-height: 1.5;
+    }
+    .powered {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      text-align: center; padding: 14px;
+      font-size: 10px; letter-spacing: 2px;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo" data-component="logo">&#9889;</div>
+  <div class="title" data-component="title">CORDOVASEEKER</div>
+  <div class="divider" data-component="divider"></div>
+
+  <div id="picker" data-component="wallet-picker">
+    <button class="btn primary" onclick="connectMWA()" data-testid="connect-wallet">
+      CONNECT WALLET
+    </button>
+    <button class="btn" onclick="launchGame()" data-testid="play-guest">
+      PLAY AS GUEST
+    </button>
+  </div>
+
+  <div id="status" data-component="status"></div>
+
+  <div id="connected" data-component="connected-panel">
+    <div class="lbl" data-component="connected-label">CONNECTED</div>
+    <div class="addr" id="addr" data-component="wallet-address"></div>
+    <button class="btn primary" onclick="launchGame()" style="margin-top:22px;" data-testid="play-button">
+      PLAY
+    </button>
+    <button class="btn danger" onclick="disconnect()" style="margin-top:8px;" data-testid="disconnect-button">
+      DISCONNECT
+    </button>
+  </div>
+
+  <div class="powered" data-component="footer">Open-source Seeker game template</div>
+
+  <!-- Cordova bridge — only exists when served from local www/ -->
+  <script src="cordova.js"></script>
+  <script>
+  'use strict';
+
+  /* ═══════════════════════════════════════════════
+     State
+     ═══════════════════════════════════════════════ */
+  var connectedAddress = null;   // wallet address after connect
+  var connectedMethod  = null;   // 'MWA'
+  // Local game bundled in www/game/. Swap for an https:// URL to load a
+  // remotely-hosted game instead (also update CSP frame-src + allow-navigation).
+  var GAME_URL    = 'game/index.html';
+  var GAME_ORIGIN = '*'; // local file — no meaningful origin; use event.source check instead
+
+  /* ═══════════════════════════════════════════════
+     UI helpers
+     ═══════════════════════════════════════════════ */
+  var $picker    = document.getElementById('picker');
+  var $status    = document.getElementById('status');
+  var $connected = document.getElementById('connected');
+  var $addr      = document.getElementById('addr');
+
+  function log(msg) {
+    console.log('[wallet-shell] ' + msg);
+  }
+
+  function setStatus(msg) { $status.textContent = msg; }
+
+  function showConnected(address, method) {
+    connectedAddress = address;
+    connectedMethod  = method;
+
+    $picker.style.display = 'none';
+    $connected.style.display = 'block';
+    $addr.textContent = address.slice(0, 4) + '...' + address.slice(-4);
+    setStatus('');
+    log('Connected: ' + address.slice(0, 8) + '...' + address.slice(-4));
+  }
+
+  function launchGame() {
+    $picker.style.display = 'none';
+    $connected.style.display = 'none';
+
+    // Create a fresh iframe each time
+    var old = document.getElementById('game');
+    if (old) old.remove();
+
+    var iframe = document.createElement('iframe');
+    iframe.id = 'game';
+    iframe.allow = 'fullscreen';
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;border:none;z-index:9999;';
+    document.body.appendChild(iframe);
+
+    if (connectedAddress) {
+      var sendWalletInfo = function() {
+        iframe.contentWindow.postMessage({
+          type: 'wallet-connected',
+          address: connectedAddress,
+          method: connectedMethod
+        }, GAME_ORIGIN);
+        log('Sent wallet-connected to iframe');
+      };
+
+      iframe.addEventListener('load', function onLoad() {
+        iframe.removeEventListener('load', onLoad);
+        setTimeout(sendWalletInfo, 800);
+      });
+    }
+
+    iframe.src = GAME_URL;
+    log('Loading game iframe...');
+  }
+
+  function disconnect() {
+    // Tell game iframe we're disconnecting
+    var iframe = document.getElementById('game');
+    if (iframe && connectedAddress) {
+      try {
+        iframe.contentWindow.postMessage({ type: 'wallet-disconnected' }, GAME_ORIGIN);
+      } catch (_) {}
+    }
+
+    // Destroy iframe completely
+    if (iframe) iframe.remove();
+
+    $picker.style.display = 'flex';
+    $connected.style.display = 'none';
+    connectedAddress = null;
+    connectedMethod  = null;
+    setStatus('');
+    log('Disconnected');
+  }
+
+  /* ═══════════════════════════════════════════════
+     Wallet connect — MWA (Native Plugin)
+     Uses the native Android MWA SDK via cordova-plugin-mwa.
+     Fires startActivity with solana-wallet:// intent,
+     wallet handles WebSocket + auth natively.
+     ═══════════════════════════════════════════════ */
+  function connectMWA() {
+    if (!window.MWA) {
+      log('MWA plugin not loaded');
+      setStatus('Wallet unavailable');
+      return;
+    }
+    setStatus('Opening wallet...');
+    log('MWA: calling native authorize...');
+
+    MWA.authorize(
+      function(result) {
+        log('Authorized: ' + result.address.slice(0, 8) + '...');
+        showConnected(result.address, 'MWA');
+      },
+      function(err) {
+        log('Connect failed: ' + err);
+        setStatus(err.replace(/^MWA[: ]+/i, ''));
+      }
+    );
+  }
+
+  /* ═══════════════════════════════════════════════
+     postMessage bridge — listen for game requests
+     ═══════════════════════════════════════════════ */
+  window.addEventListener('message', function(event) {
+    // Local iframe has no https origin — verify the sender is our game frame
+    var gameFrame = document.getElementById('game');
+    if (!gameFrame || event.source !== gameFrame.contentWindow) return;
+    var data = event.data;
+    if (!data || !data.type) return;
+
+    if (data.type === 'wallet-disconnect') {
+      log('Game requested disconnect');
+      disconnect();
+    }
+
+    if (data.type === 'wallet-request-info' && connectedAddress) {
+      // Game is asking for wallet info (e.g. after late init)
+      var iframe = document.getElementById('game');
+      iframe.contentWindow.postMessage({
+        type: 'wallet-connected',
+        address: connectedAddress,
+        method: connectedMethod
+      }, GAME_ORIGIN);
+      log('Re-sent wallet info to iframe');
+    }
+
+    // Sign a message with the connected MWA wallet (native approval dialog)
+    if (data.type === 'wallet-sign-message') {
+      log('Sign request (message) — id:' + data.id);
+      var signIframe = document.getElementById('game');
+      var respond = function(payload) {
+        payload.type = 'wallet-sign-response';
+        payload.id = data.id;
+        signIframe.contentWindow.postMessage(payload, GAME_ORIGIN);
+      };
+      if (connectedMethod === 'MWA' && window.MWA) {
+        var messageB64 = btoa(String.fromCharCode.apply(null, new TextEncoder().encode(data.message)));
+        MWA.signMessage(messageB64,
+          function(result) { log('Signed message (MWA)'); respond({ signature: result.signature }); },
+          function(err)    { log('Sign failed: ' + err); respond({ error: err }); }
+        );
+      } else {
+        respond({ error: 'No wallet connected' });
+      }
+    }
+  });
+
+  /* ═══════════════════════════════════════════════
+     Init
+     ═══════════════════════════════════════════════ */
+  log('Shell loaded');
+
+  document.addEventListener('deviceready', function() {
+    log('deviceready');
+  }, false);
+  </script>
+</body>
+</html>

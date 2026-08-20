@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-mwa"
+        version="1.0.0">
+    <name>MWA Plugin</name>
+    <description>Native Mobile Wallet Adapter for Solana wallet discovery and authorization</description>
+
+    <js-module src="www/mwa.js" name="MWA">
+        <clobbers target="MWA" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="MWAPlugin">
+                <param name="android-package" value="com.example.cordovaseeker.MWAPlugin" />
+            </feature>
+        </config-file>
+
+        <source-file src="src/android/MWAPlugin.java"
+                     target-dir="src/com/example/cordovaseeker" />
+
+        <!-- MWA Java client library (NOT ktx — uses futures, not coroutines) -->
+        <framework src="com.solanamobile:mobile-wallet-adapter-clientlib:2.0.8" />
+    </platform>
+</plugin>

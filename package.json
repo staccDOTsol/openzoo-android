@@ -1,0 +1,33 @@
+{
+  "name": "com.example.cordovaseeker",
+  "displayName": "CordovaSeeker",
+  "version": "1.0.0",
+  "description": "Open-source template for building Solana Seeker games with plain web tech — Cordova shell + native Mobile Wallet Adapter plugin, no Unity required",
+  "main": "index.js",
+  "scripts": {
+    "build": "cordova build android",
+    "build:release": "cordova build android --release",
+    "run": "cordova run android",
+    "clean": "cordova clean android",
+    "requirements": "cordova requirements android"
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "solana",
+    "seeker",
+    "mobile-wallet-adapter"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "cordova-android": "^14.0.1",
+    "cordova-plugin-mwa": "file:cordova-plugin-mwa"
+  },
+  "cordova": {
+    "platforms": [
+      "android"
+    ],
+    "plugins": {
+      "cordova-plugin-mwa": {}
+    }
+  }
+}

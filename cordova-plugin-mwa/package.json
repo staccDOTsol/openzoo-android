@@ -1,0 +1,16 @@
+{
+  "name": "cordova-plugin-mwa",
+  "version": "1.0.0",
+  "description": "Native Mobile Wallet Adapter for Solana wallet discovery and authorization",
+  "cordova": {
+    "id": "cordova-plugin-mwa",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "license": "MIT"
+}
