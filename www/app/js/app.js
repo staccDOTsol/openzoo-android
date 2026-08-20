@@ -690,5 +690,8 @@
     renderChat();
   }
   syncDials();
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: "openzoo-chrome-ready" }, "*");
+  }
   loadModels();
 })();

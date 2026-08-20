@@ -137,6 +137,33 @@ check("Cordova entry is the Play paywall, then iframe chat — not a wallet shel
   assert.match(chat, /id="sideNewBtn"/);
 });
 
+check("dark launch loader stays up until chrome-ready, not models or Play", () => {
+  const shell = read("www/index.html");
+  const app = read("www/app/js/app.js");
+  const cfg = read("config.xml");
+  const bodyIdx = shell.indexOf("<body>");
+  const bootIdx = shell.indexOf('id="oz-boot"');
+  const logoIdx = shell.indexOf('class="logo"');
+  assert.ok(bodyIdx !== -1 && bootIdx !== -1 && bootIdx > bodyIdx && bootIdx < logoIdx);
+  assert.match(shell, /#oz-boot\s*\{[^}]*z-index:\s*10000/);
+  assert.match(shell, /#oz-boot\s*\{[^}]*background:\s*#0a0a18/);
+  assert.match(shell, /starting<span class="oz-dot">\.<\/span>/);
+  assert.match(shell, /text-transform:\s*lowercase/);
+  assert.doesNotMatch(shell, /id="oz-boot"[^>]*>[\s\S]*?<img/);
+  assert.doesNotMatch(shell, /cordova-plugin-splashscreen|cdv-splashscreen|navigator\.splashscreen/i);
+  assert.match(cfg, /AutoHideSplashScreen"\s+value="true"/);
+  assert.match(shell, /function launchApp\(\) \{\s*showBoot\(\);/);
+  assert.match(shell, /bootHideTimer = setTimeout\(dismissBoot, 4000\)/);
+  assert.match(shell, /setTimeout\(sendReady, 300\);\s*setTimeout\(dismissBoot, 50\)/);
+  assert.match(shell, /DOMContentLoaded[\s\S]*hasEntitlement\(billingState\)\) hideBoot\(\)/);
+  assert.match(shell, /data\.type === 'openzoo-chrome-ready'/);
+  assert.match(app, /postMessage\(\{ type: "openzoo-chrome-ready" \}/);
+  const readyAt = app.indexOf('openzoo-chrome-ready');
+  const modelsAt = app.lastIndexOf("loadModels();");
+  assert.ok(readyAt !== -1 && modelsAt !== -1 && readyAt < modelsAt);
+  assert.ok(app.indexOf("function loadModels()") < readyAt);
+});
+
 check("widget id is fun.openzoo.android; Cordova stays; MWA is gone", () => {
   const cfg = read("config.xml");
   const pkg = JSON.parse(read("package.json"));
