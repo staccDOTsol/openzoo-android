@@ -35,20 +35,41 @@
     .tprice { font-size: 15px; color: #ececec; margin-top: 2px; }
     .tblurb { font-size: 13px; color: #8e8e93; margin-top: 6px; }
     .tmeta { font-size: 12px; color: #8e8e93; margin-top: 8px; line-height: 1.45; }
-    #restore {
-      margin-top: 16px; background: none; border: 1px solid #2c2c2e; color: #ececec;
-      border-radius: 12px; padding: 10px 16px; font: inherit;
+    #restore, .ghost {
+      margin-top: 10px; background: none; border: 1px solid #2c2c2e; color: #ececec;
+      border-radius: 12px; padding: 10px 16px; font: inherit; width: 100%; max-width: 420px;
     }
+    #continueX402 { border-color: #b8f240; color: #b8f240; }
     #status { margin-top: 14px; font-size: 12px; color: #8e8e93; text-align: center; max-width: 360px; min-height: 18px; }
+    #x402 { width: 100%; max-width: 420px; margin-top: 22px; }
+    .or {
+      text-align: center; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+      color: #b8f240; margin-bottom: 8px;
+    }
+    .xsub { font-size: 13px; color: #8e8e93; text-align: center; line-height: 1.45; margin-bottom: 12px; }
+    .wrow { border: 1px solid #1c1c1e; border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+    .wlab { color: #6f7080; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .waddr {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+      word-break: break-all; -webkit-user-select: text; user-select: text;
+      cursor: pointer; color: #ececec; margin-top: 4px;
+    }
+    #toast {
+      position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(12px); background: #ececec; color: #111;
+      border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+      opacity: 0; pointer-events: none; z-index: 120; transition: opacity .15s, transform .15s;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     .powered { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 14px;
                font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
   <div class="logo"><img src="img/token.jpg" alt="OpenZoo"></div>
-  <div class="tag" id="tagline">Subscription keys · no x402</div>
+  <div class="tag" id="tagline">Card first · x402 also works</div>
   <div class="title">openzoo</div>
-  <p class="sub">Pick a plan. Google Play Billing checkout — not Stripe, not a wallet. Usage invoices at $1.00.</p>
+  <p class="sub">Card / Google Play first. x402 / wallet is the other working option — not a lock. Usage invoices at $1.00.</p>
 
   <div id="tiers" data-component="play-paywall">
     <button type="button" class="tier" data-tier="basic" data-product="fun.openzoo.android.sub.basic">
@@ -74,30 +95,101 @@
     </button>
   </div>
   <button id="restore" type="button">Restore purchases</button>
+
+  <div id="x402" data-component="x402-pay">
+    <div class="or">or pay with x402 / wallet</div>
+    <p class="xsub">Phantom via MWA, or a local burner on this phone. Tap an address to copy. Wrap TOKEN so a message can send. Needs a little SOL + tokens.</p>
+    <button type="button" class="ghost" id="connectPhantom">Connect Phantom</button>
+    <button type="button" class="ghost" id="useBurner">Use local burner</button>
+    <button type="button" class="ghost" id="continueX402">Continue with x402</button>
+    <div class="wrow">
+      <div class="wlab">Phantom</div>
+      <div id="phantomAddr" class="waddr" data-copy-kind="phantom">not connected</div>
+    </div>
+    <div class="wrow">
+      <div class="wlab">Local burner</div>
+      <div id="burnerAddr" class="waddr" data-copy-kind="local-burner">not created</div>
+    </div>
+  </div>
+
   <div id="status"></div>
-  <div class="powered">fun.openzoo.android · Google Play Billing</div>
+  <div id="toast" role="status" aria-live="polite">copied</div>
+  <div class="powered">fun.openzoo.android · Card first · x402 also works</div>
 
   <script src="cordova.js"></script>
+  <script src="vendor/nacl-fast.min.js"></script>
+  <script src="app/js/solana-lite.js"></script>
   <script src="js/billing.js"></script>
+  <script src="js/burner.js"></script>
   <script src="js/clipboard.js"></script>
   <script>
   'use strict';
 
   var B = window.OpenZooBilling;
+  var Burner = window.OpenZooBurner;
+  var Copy = window.OpenZooCopy;
   var GAME_URL = 'app/index.html';
   var GAME_ORIGIN = '*';
   var connectedAddress = null;
   var connectedMethod = null;
   var billingState = B.readStore();
+  var x402State = Burner ? Burner.readSession() : {};
+  var playAvailable = null;
   var busy = false;
 
   var $tiers = document.getElementById('tiers');
   var $status = document.getElementById('status');
   var $restore = document.getElementById('restore');
   var $tag = document.getElementById('tagline');
+  var $x402 = document.getElementById('x402');
 
   function log(msg) { console.log('[play-shell] ' + msg); }
   function setStatus(msg) { $status.textContent = msg || ''; }
+
+  function showToast(msg) {
+    var el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg || 'copied';
+    el.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { el.classList.remove('show'); }, 1600);
+  }
+
+  function nativeCopy(value) {
+    return new Promise(function (resolve, reject) {
+      if (window.OpenZooClipboard && typeof window.OpenZooClipboard.copy === 'function') {
+        window.OpenZooClipboard.copy(value, resolve, function (err) { reject(new Error(err)); });
+        return;
+      }
+      reject(new Error('clipboard unavailable'));
+    });
+  }
+
+  function copyText(text, kind) {
+    if (!text) return;
+    var label = Copy ? Copy.toastLabel(kind) : (kind === 'local-burner' || kind === 'burner' ? 'copied local burner' : 'copied');
+    var job = Copy
+      ? Copy.copyText(text, nativeCopy).catch(function () { return Copy.copyText(text); })
+      : nativeCopy(text);
+    job.then(function () { showToast(label); }).catch(function () {});
+  }
+
+  function setAddrEl(id, addr, kind) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = addr || (kind === 'local-burner' ? 'not created' : 'not connected');
+    el.setAttribute('data-address', addr || '');
+    el.setAttribute('data-copy-kind', kind || 'phantom');
+  }
+
+  function wireCopyable(el) {
+    if (!el || el.getAttribute('data-copy-wired')) return;
+    el.setAttribute('data-copy-wired', '1');
+    el.addEventListener('click', function () {
+      var addr = el.getAttribute('data-address');
+      if (addr) copyText(addr, el.getAttribute('data-copy-kind'));
+    });
+  }
 
   function launchApp() {
     var old = document.getElementById('game');
@@ -108,6 +200,7 @@
     $tag.style.display = 'none';
     $tiers.style.display = 'none';
     $restore.style.display = 'none';
+    if ($x402) $x402.style.display = 'none';
     $status.style.display = 'none';
     document.querySelector('.powered').style.display = 'none';
 
@@ -138,7 +231,7 @@
       setTimeout(sendReady, 300);
     });
     iframe.src = GAME_URL;
-    log('Loading grokui iframe after Play entitlement');
+    log('Loading grokui iframe (Play and/or x402)');
   }
 
   function showPaywall() {
@@ -148,6 +241,7 @@
     $tag.style.display = '';
     $tiers.style.display = 'flex';
     $restore.style.display = '';
+    if ($x402) $x402.style.display = '';
     $status.style.display = '';
     document.querySelector('.powered').style.display = '';
     var iframe = document.getElementById('game');
@@ -241,8 +335,8 @@
       });
     }).catch(function (e) {
       var msg = (e && e.message) || String(e);
-      if (/cancel/i.test(msg)) setStatus('Purchase canceled');
-      else setStatus(msg);
+      if (/cancel/i.test(msg)) setStatus('Purchase canceled. x402 / wallet below still works.');
+      else setStatus(msg + ' — x402 / wallet below still works.');
     }).then(function () {
       busy = false;
       setBusy(false);
@@ -266,7 +360,7 @@
         return exchangeAndEnter(first);
       });
     }).catch(function (e) {
-      setStatus((e && e.message) || String(e));
+      setStatus(((e && e.message) || String(e)) + ' — x402 / wallet below still works.');
     }).then(function () {
       busy = false;
       setBusy(false);
@@ -309,16 +403,46 @@
     if (btn) subscribe(btn.getAttribute('data-tier'));
   });
   $restore.onclick = restore;
+  document.getElementById('connectPhantom').onclick = connectMWA;
+  document.getElementById('useBurner').onclick = useBurner;
+  document.getElementById('continueX402').onclick = function () {
+    enterViaX402(connectedAddress, connectedMethod || 'x402');
+  };
+  wireCopyable(document.getElementById('phantomAddr'));
+  wireCopyable(document.getElementById('burnerAddr'));
+
+  function persistX402(next) {
+    x402State = Burner.writeSession(Object.assign({ chosen: true, updatedAt: Date.now() }, next || {}));
+    return x402State;
+  }
+
+  function enterViaX402(address, method) {
+    if (address) {
+      connectedAddress = address;
+      connectedMethod = method;
+    }
+    persistX402({ address: connectedAddress || null, method: connectedMethod || 'x402' });
+    launchApp();
+  }
+
+  function refreshWalletUi() {
+    setAddrEl('phantomAddr', connectedMethod === 'MWA' ? connectedAddress : '', 'phantom');
+    var loaded = Burner && Burner.load();
+    setAddrEl('burnerAddr', loaded && loaded.address, 'local-burner');
+  }
 
   function connectMWA() {
     if (!window.MWA) {
-      setStatus('Wallet is a Settings option — subscribe with Play first');
+      setStatus('Phantom MWA needs a real phone with Phantom. Use the local burner or Continue with x402.');
       return;
     }
+    setStatus('Opening Phantom…');
     window.MWA.authorize(
       function (result) {
         connectedAddress = result.address;
         connectedMethod = 'MWA';
+        persistX402({ address: connectedAddress, method: 'MWA' });
+        refreshWalletUi();
         var iframe = document.getElementById('game');
         if (iframe && iframe.contentWindow) {
           iframe.contentWindow.postMessage({
@@ -326,10 +450,36 @@
             address: connectedAddress,
             method: connectedMethod,
           }, GAME_ORIGIN);
+        } else {
+          enterViaX402(connectedAddress, 'MWA');
         }
       },
-      function (err) { setStatus(String(err).replace(/^MWA[: ]+/i, '')); }
+      function (err) { setStatus(String(err).replace(/^MWA[: ]+/i, '') + ' — local burner below still works.'); }
     );
+  }
+
+  function useBurner() {
+    if (!Burner) {
+      setStatus('Local burner is unavailable');
+      return;
+    }
+    var row = Burner.connect();
+    connectedAddress = row.address;
+    connectedMethod = 'burner';
+    persistX402({ address: row.address, method: 'burner' });
+    refreshWalletUi();
+    setStatus(row.disclaimer);
+    copyText(row.address, 'local-burner');
+    var iframe = document.getElementById('game');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: 'wallet-connected',
+        address: connectedAddress,
+        method: connectedMethod,
+      }, GAME_ORIGIN);
+    } else {
+      enterViaX402(row.address, 'burner');
+    }
   }
 
   window.addEventListener('message', function (event) {
@@ -367,13 +517,16 @@
     }
 
     if (data.type === 'wallet-connect-request') {
-      connectMWA();
+      if (data.method === 'burner') useBurner();
+      else connectMWA();
       return;
     }
 
     if (data.type === 'wallet-disconnect') {
       connectedAddress = null;
       connectedMethod = null;
+      persistX402({ address: null, method: 'x402' });
+      refreshWalletUi();
       gameFrame.contentWindow.postMessage({ type: 'wallet-disconnected' }, GAME_ORIGIN);
     }
 
@@ -397,6 +550,14 @@
           function (result) { respondMsg({ signature: result.signature }); },
           function (err) { respondMsg({ error: err }); }
         );
+      } else if (connectedMethod === 'burner' && Burner) {
+        try {
+          var naclApi = window.nacl;
+          var loaded = Burner.load();
+          if (!loaded || !naclApi) throw new Error('No local burner key on this phone');
+          var sig = naclApi.sign.detached(new TextEncoder().encode(data.message), loaded.secretKey);
+          respondMsg({ signature: window.OpenZooSolana.encodeBase58(sig) });
+        } catch (e) { respondMsg({ error: String((e && e.message) || e) }); }
       } else respondMsg({ error: 'No wallet connected' });
     }
 
@@ -412,6 +573,10 @@
           function (result) { respondTx({ signedTransaction: result.signedTransaction }); },
           function (err) { respondTx({ error: err }); }
         );
+      } else if (connectedMethod === 'burner' && Burner) {
+        try {
+          respondTx(Burner.signTransaction(data.transaction));
+        } catch (e) { respondTx({ error: String((e && e.message) || e) }); }
       } else respondTx({ error: 'No wallet connected' });
     }
 
@@ -422,23 +587,64 @@
         gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
       };
       if (connectedMethod === 'MWA' && window.MWA) {
-        // Wrap / top-up only — wallet may broadcast. Not the first-run path.
+        // Wrap / top-up only — wallet may broadcast. Not the card-only path.
         window.MWA.signAndSendTransaction(data.transaction,
           function (result) { respondSend({ signature: result.signature }); },
           function (err) { respondSend({ error: err }); }
         );
+      } else if (connectedMethod === 'burner' && Burner) {
+        Burner.signAndSendTransaction(data.transaction).then(function (result) {
+          respondSend({ signature: result.signature });
+        }).catch(function (err) {
+          respondSend({ error: String((err && err.message) || err) });
+        });
       } else respondSend({ error: 'No wallet connected' });
     }
   });
 
+  function probePlay() {
+    return new Promise(function (resolve) {
+      if (!window.PlayBilling) {
+        playAvailable = false;
+        resolve(false);
+        return;
+      }
+      window.PlayBilling.queryProducts(
+        [B.PRODUCT_IDS.basic, B.PRODUCT_IDS.pro, B.PRODUCT_IDS.ultra],
+        function (rows) {
+          playAvailable = !!(rows && rows.length);
+          resolve(playAvailable);
+        },
+        function () {
+          playAvailable = false;
+          resolve(false);
+        }
+      );
+    });
+  }
+
   function boot() {
+    if (x402State && x402State.address) {
+      connectedAddress = x402State.address;
+      connectedMethod = x402State.method || 'x402';
+    } else if (x402State && x402State.chosen && Burner) {
+      var existing = Burner.load();
+      if (existing) {
+        connectedAddress = existing.address;
+        connectedMethod = 'burner';
+      }
+    }
+    refreshWalletUi();
     B.loadTiers().then(function (model) {
       renderTiers(model);
-      if (B.hasEntitlement(billingState)) {
+      if (B.canEnterApp(billingState, x402State)) {
         launchApp();
         return;
       }
-      setStatus(model.trialDays ? '' : 'No free trial. Google Play checkout.');
+      probePlay().then(function (ok) {
+        if (ok) setStatus('Card first. x402 / wallet below also works.');
+        else setStatus('Play Billing is not on this install (sideload / no products). Use x402 below.');
+      });
     });
   }
 

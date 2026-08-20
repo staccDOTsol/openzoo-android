@@ -56,7 +56,7 @@ function tier(id) {
   });
   assert.strictEqual(model.trialDays, 0);
   assert.strictEqual(model.usageThresholdCents, 100);
-  assert.strictEqual(model.tagline, "Subscription keys · no x402");
+  assert.strictEqual(model.tagline, "Card first · x402 also works");
   assert.strictEqual(model.tiers.find((t) => t.id === "pro").highlight, "Most teams want this");
   assert.strictEqual(model.tiers.find((t) => t.id === "basic").priceLabel, "$9/mo");
   assert.strictEqual(model.tiers.find((t) => t.id === "pro").priceLabel, "$29/mo");
@@ -71,18 +71,23 @@ function tier(id) {
   console.log("ok stripe checkout detector");
 })();
 
-(function paywallLeadsWithPlayNotPhantom() {
+(function paywallLeadsWithPlayThenX402() {
   const html = load("www/index.html");
-  assert.ok(html.includes("Subscription keys · no x402"));
+  assert.ok(html.includes("Card first · x402 also works"));
   assert.ok(html.includes("Most teams want this"));
   assert.ok(html.includes("js/billing.js"));
   assert.ok(html.includes("Restore purchases"));
   assert.ok(html.includes("Google Play"));
-  assert.ok(!html.includes("CONNECT PHANTOM"));
+  assert.ok(html.includes("Continue with x402"));
+  assert.ok(html.includes("Use local burner"));
+  assert.ok(html.includes('data-component="play-paywall"'));
+  assert.ok(html.includes('data-component="x402-pay"'));
+  assert.ok(html.indexOf("play-paywall") < html.indexOf("x402-pay"));
   assert.ok(!html.includes("checkout.stripe.com"));
   assert.ok(!html.includes("/api/billing/checkout"));
   assert.ok(!html.includes("InAppBrowser"));
-  console.log("ok paywall leads with Play Billing");
+  assert.ok(!html.includes("https://phantom.app/ul/"));
+  console.log("ok paywall leads with Play Billing, x402 escape under it");
 })();
 
 (function playPluginPresent() {
@@ -101,24 +106,34 @@ function tier(id) {
   console.log("ok Play Billing plugin");
 })();
 
-(function grokuiDoesNotLeadWithWallet() {
+(function grokuiKeepsX402Working() {
   const html = load("www/app/index.html");
   assert.ok(html.includes("Settings"));
-  assert.ok(html.includes("Phantom") && html.includes("optional"));
+  assert.ok(html.includes("x402 / wallet"));
+  assert.ok(html.includes("Use local burner"));
+  assert.ok(html.includes('data-component="new-chat"'));
   const js = load("www/app/js/app.js");
   assert.ok(js.includes("requestWalletConnect"));
   assert.ok(js.includes("signOutBilling"));
-  assert.ok(!js.includes("Connect Phantom to send"));
+  assert.ok(js.includes("sideNewBtn"));
+  assert.match(js, /headerNewBtn/);
   const pay = load("www/app/js/pay.js");
-  assert.ok(pay.includes("SubscriptionRequiredError"));
-  assert.ok(pay.includes("walletPayEnabled"));
-  console.log("ok grokui Play-first, wallet secondary");
+  assert.ok(pay.includes("ConnectWalletError"));
+  assert.ok(!/throw new SubscriptionRequiredError/.test(pay));
+  const shell = load("www/index.html");
+  assert.ok(shell.includes("canEnterApp"));
+  assert.ok(shell.includes("enterViaX402"));
+  console.log("ok grokui Play-first with working x402 escape");
 })();
 
 (function entitlementFromPurchaseToken() {
   assert.ok(B.hasEntitlement({ purchase: { purchaseToken: "GPA.TEST" } }));
   assert.ok(B.hasEntitlement({ key: "oz_live_test" }));
   assert.ok(!B.hasEntitlement({}));
+  assert.ok(B.canEnterApp({ purchase: { purchaseToken: "GPA.TEST" } }, {}));
+  assert.ok(B.canEnterApp({}, { chosen: true }));
+  assert.ok(B.canEnterApp({}, { address: "So1anaBurner1111111111111111111111111111111" }));
+  assert.ok(!B.canEnterApp({}, {}));
   console.log("ok entitlement");
 })();
 

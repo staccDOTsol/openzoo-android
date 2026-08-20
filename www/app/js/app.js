@@ -94,7 +94,7 @@
       var empty = document.createElement("div");
       empty.className = "tprev";
       empty.style.padding = "16px";
-      empty.textContent = threads.length ? "No matches" : "New thread with +";
+      empty.textContent = threads.length ? "No matches" : "New chat";
       el.appendChild(empty);
       return;
     }
@@ -170,7 +170,7 @@
     $("headAv").style.background = t ? (t.color || colorFor(t.name)) : "#5e5ce6";
     if (t && t.model) $("model").value = t.model;
     if (!t || !t.messages.length) {
-      bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.", false);
+      bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files. pay with Play card first, or x402 / wallet.", false);
     } else {
       t.messages.forEach(function (m) {
         bubble(m.content, m.role === "user", m.meta || "");
@@ -320,14 +320,19 @@
   function planLabel() {
     var b = P.getBilling ? P.getBilling() : {};
     if (b && b.tier) return (b.tier.charAt(0).toUpperCase() + b.tier.slice(1)) + (b.key ? " · key ready" : " · waiting on Play key exchange");
-    return "Play subscription";
+    var addr = P.getAddress && P.getAddress();
+    if (addr) return "x402 / wallet · " + addr.slice(0, 4) + "…" + addr.slice(-4);
+    return "Card first · x402 also works";
   }
 
   function openSettings() {
     $("settingsOverlay").classList.add("show");
     $("planBody").textContent = planLabel();
-    setAddrEl("walletAddr", P.getAddress(), "phantom");
-    setAddrEl("walletDetail", P.getAddress(), "phantom");
+    var kind = P.getMethod ? P.getMethod() : "";
+    var addr = P.getAddress();
+    setAddrEl("walletAddr", kind === "burner" ? "" : addr, "phantom");
+    setAddrEl("walletDetail", addr, kind === "burner" ? "local-burner" : "phantom");
+    setAddrEl("burnerAddr", kind === "burner" ? addr : "", "local-burner");
   }
 
   function postBind(corpus, contextId) {
@@ -523,8 +528,16 @@
       });
   }
 
-  $("newBtn").onclick = function () { newThread(); };
-  if ($("headerNewBtn")) $("headerNewBtn").onclick = function () { newThread(); };
+  function startNewChat() { newThread(); }
+  if ($("newBtn")) $("newBtn").onclick = startNewChat;
+  if ($("headerNewBtn")) $("headerNewBtn").onclick = startNewChat;
+  if ($("sideNewBtn")) {
+    $("sideNewBtn").onclick = function () {
+      startNewChat();
+      $("sidebar").classList.remove("open");
+      $("scrim").classList.remove("show");
+    };
+  }
   $("menuBtn").onclick = function () {
     $("sidebar").classList.add("open");
     $("scrim").classList.add("show");
@@ -579,7 +592,8 @@
   $("settingsBtn").onclick = openSettings;
   $("settingsClose").onclick = function () { $("settingsOverlay").classList.remove("show"); };
   $("changePlanBtn").onclick = function () { P.signOutBilling(); };
-  $("connectWalletBtn").onclick = function () { P.requestWalletConnect(); };
+  $("connectWalletBtn").onclick = function () { P.requestWalletConnect("MWA"); };
+  if ($("useBurnerBtn")) $("useBurnerBtn").onclick = function () { P.requestWalletConnect("burner"); };
   $("walletClose").onclick = function () { $("walletOverlay").classList.remove("show"); };
   $("leaveBtn").onclick = function () { P.disconnectWallet(); };
   $("fundsClose").onclick = function () { $("fundsOverlay").classList.remove("show"); };
@@ -599,8 +613,10 @@
 
   window.addEventListener("openzoo-wallet", function (e) {
     var addr = e.detail && e.detail.address;
-    setAddrEl("walletAddr", addr, "phantom");
-    setAddrEl("walletDetail", addr, "phantom");
+    var method = e.detail && e.detail.method;
+    setAddrEl("walletAddr", method === "burner" ? "" : addr, "phantom");
+    setAddrEl("walletDetail", addr, method === "burner" ? "local-burner" : "phantom");
+    setAddrEl("burnerAddr", method === "burner" ? addr : "", "local-burner");
     if (!addr && $("walletOverlay")) $("walletOverlay").classList.remove("show");
   });
   window.addEventListener("openzoo-billing", function () {
@@ -649,6 +665,7 @@
   wireCopyable($("walletAddr"));
   wireCopyable($("walletDetail"));
   wireCopyable($("fundsAddr"));
+  wireCopyable($("burnerAddr"));
 
   if (!threads.length) newThread();
   else {

@@ -5,6 +5,7 @@
   var W = root.OpenZooWrap;
   var S = root.OpenZooSolana;
   var walletAddress = null;
+  var walletMethod = null;
   var walletPayEnabled = false;
   var billing = { key: null, tier: null, pending: false };
   var signWaiters = {};
@@ -18,6 +19,10 @@
 
   function getAddress() {
     return walletAddress;
+  }
+
+  function getMethod() {
+    return walletMethod;
   }
 
   function requestWalletInfo() {
@@ -82,13 +87,15 @@
     }
     if (data.type === "wallet-connected") {
       setAddress(data.address);
+      walletMethod = data.method || "MWA";
       walletPayEnabled = true;
       root.dispatchEvent(new CustomEvent("openzoo-wallet", {
-        detail: { address: data.address, method: data.method },
+        detail: { address: data.address, method: walletMethod },
       }));
     }
     if (data.type === "wallet-disconnected") {
       setAddress(null);
+      walletMethod = null;
       walletPayEnabled = false;
       root.dispatchEvent(new CustomEvent("openzoo-wallet", { detail: { address: null } }));
     }
@@ -442,9 +449,9 @@
     });
   }
 
-  function requestWalletConnect() {
+  function requestWalletConnect(method) {
     if (root.parent && root.parent !== root) {
-      root.parent.postMessage({ type: "wallet-connect-request" }, "*");
+      root.parent.postMessage({ type: "wallet-connect-request", method: method || "MWA" }, "*");
     }
   }
 
@@ -526,8 +533,8 @@
       if (!payer) {
         throw new ConnectWalletError(
           billing.key
-            ? "This call still asked for payment. Connect Phantom to wrap TOKEN and send, or restore purchases."
-            : "Connect Phantom to wrap TOKEN and send, or subscribe with Google Play."
+            ? "This call still asked for payment. Connect Phantom or use the local burner to wrap TOKEN and send."
+            : "Connect Phantom or use the local burner (x402), or subscribe with Google Play."
         );
       }
       return readBody(res).then(function (challenge) {
@@ -610,6 +617,7 @@
   root.OpenZooPay = {
     setAddress: setAddress,
     getAddress: getAddress,
+    getMethod: getMethod,
     requestWalletInfo: requestWalletInfo,
     requestWalletConnect: requestWalletConnect,
     disconnectWallet: disconnectWallet,

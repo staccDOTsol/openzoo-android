@@ -21,7 +21,7 @@
   var STRIPE_KEY_URL = BILLING_ORIGIN + "/api/billing/key";
   var PACKAGE_NAME = "fun.openzoo.android";
   var STORE_KEY = "openzoo.android.billing.v1";
-  var TAGLINE = "Subscription keys · no x402";
+  var TAGLINE = "Card first · x402 also works";
   var HIGHLIGHT_TIER = "pro";
   var HIGHLIGHT_COPY = "Most teams want this";
 
@@ -211,6 +211,14 @@
     return !!(state.key || (state.purchase && state.purchase.purchaseToken));
   }
 
+  /**
+   * Play purchase is the card path. x402 is the other working option.
+   * Never treat a missing Play token as a lock-out.
+   */
+  function canEnterApp(billingState, x402State) {
+    return hasEntitlement(billingState) || !!(x402State && (x402State.chosen || x402State.address));
+  }
+
   function isStripeCheckoutUrl(url) {
     try {
       var u = new URL(url);
@@ -242,6 +250,7 @@
     readStore: readStore,
     writeStore: writeStore,
     hasEntitlement: hasEntitlement,
+    canEnterApp: canEnterApp,
     isStripeCheckoutUrl: isStripeCheckoutUrl,
   };
 });

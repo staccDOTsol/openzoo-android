@@ -44,10 +44,23 @@
                 border-bottom: 1px solid #1c1c1e; display: flex; align-items: center; gap: 8px; font-weight: 600; }
   #chatHeaderId { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden; }
   .hname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #headerDials { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  #headerDials { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .dial { border: 1px solid #2c2c2e; background: #131315; color: #8e8e93; font: inherit; font-size: 11px;
           border-radius: 999px; padding: 4px 8px; cursor: pointer; max-width: 140px; }
   .dial:hover { color: #ececec; border-color: #3a3a3c; }
+  #headerNewBtn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    background: #fff; color: #000; border: 0; border-radius: 999px;
+    padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700;
+    white-space: nowrap; cursor: pointer;
+  }
+  .new-chat-row {
+    display: block; margin: 8px 8px 6px; width: calc(100% - 16px);
+    background: #1c1c1e; color: #ececec; border: 1px solid #2c2c2e; border-radius: 12px;
+    padding: 12px 14px; font: inherit; font-size: 15px; font-weight: 700;
+    text-align: left; cursor: pointer;
+  }
+  .new-chat-row:hover { background: #2c2c2e; }
   #log { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 8px;
          display: flex; flex-direction: column; gap: 6px; -webkit-user-select: text; user-select: text; }
   .row { display: flex; max-width: 86%; min-width: 0; margin: 2px 0; }
@@ -124,6 +137,8 @@
     #sidebar.open { transform: none; }
     #menuBtn { display: flex; }
     #scrim.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30; }
+    #headerNewBtn { display: inline-flex; }
+    #model { max-width: 72px; }
   }
 </style>
 </head>
@@ -132,10 +147,8 @@
   <div id="sidebar">
     <div id="sideTop">
       <input id="search" placeholder="Search" autocomplete="off">
-      <button class="icon-btn" id="newBtn" title="New thread" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
     </div>
+    <button type="button" class="new-chat-row" id="sideNewBtn" data-component="new-chat">New chat</button>
     <div id="threads"></div>
   </div>
 
@@ -148,10 +161,10 @@
         <div class="tavatar" id="headAv">OZ</div>
         <div class="hname" id="headName">openzoo</div>
       </div>
+      <button type="button" id="headerNewBtn" data-component="new-chat">New chat</button>
       <div id="headerDials">
         <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
         <datalist id="modelList"></datalist>
-        <button class="dial" id="headerNewBtn" type="button">New chat</button>
         <button class="dial" id="settingsBtn" type="button">settings</button>
       </div>
     </div>
@@ -183,19 +196,24 @@
   <div id="settingsOverlay">
     <div class="sheet">
       <h3>Settings</h3>
-      <p class="wsub">Google Play subscription first. Phantom / x402 is optional and off by default.</p>
+      <p class="wsub">Card / Google Play first. x402 / wallet is the other working option — not a lock.</p>
       <div id="planBody" class="wbal">loading plan…</div>
       <div class="actions">
         <button class="ghost" id="changePlanBtn" type="button">Change plan</button>
       </div>
-      <h3 style="margin-top:18px">Phantom (optional)</h3>
-      <p class="tiny">Crypto wrap stays here for later. It is not how you start the app. Tap or select an address to copy.</p>
+      <h3 style="margin-top:18px">x402 / wallet</h3>
+      <p class="tiny">Phantom via MWA, or a local burner. Tap an address to copy. Wrap TOKEN so a message can send.</p>
       <div class="wrow">
         <div class="wlab">Phantom</div>
         <div id="walletAddr" class="waddr" data-copy-kind="phantom">not connected</div>
       </div>
+      <div class="wrow">
+        <div class="wlab">Local burner</div>
+        <div id="burnerAddr" class="waddr" data-copy-kind="local-burner">not created</div>
+      </div>
       <div class="actions">
         <button class="ghost" id="connectWalletBtn" type="button">Connect Phantom</button>
+        <button class="ghost" id="useBurnerBtn" type="button">Use local burner</button>
         <button class="ghost" id="leaveBtn" type="button">disconnect</button>
         <button class="ghost" id="settingsClose" type="button">close</button>
       </div>
@@ -243,7 +261,7 @@
   <div id="wrapOverlay">
     <div class="sheet">
       <h3 id="wrapTitle">Wrap TOKEN to send this?</h3>
-      <p class="tiny" id="wrapBody">Phantom will wrap a little TOKEN so this message can send.</p>
+      <p class="tiny" id="wrapBody">This wallet will wrap a little TOKEN so this message can send.</p>
       <div class="actions">
         <button class="sendish" id="wrapOk" type="button">Wrap TOKEN</button>
         <button class="ghost" id="wrapCancel" type="button">cancel</button>

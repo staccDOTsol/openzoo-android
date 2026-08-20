@@ -1,14 +1,14 @@
 # OpenZoo Android — grokui on a phone
 
 Generic **OpenZoo** for any Android 14+ phone, shipped via Google Play.
-Apache Cordova shell + **Google Play Billing** first-run, plus optional
-Phantom Mobile Wallet Adapter (`cordova-plugin-mwa`).
+Apache Cordova shell + **Google Play Billing** first (the card path), plus
+**x402 / wallet** as the other working option (Phantom MWA + local burner).
 
 This is the same product as the desktop grokui client: **threads, chat**,
 and **attach → bind behind the scenes**. Subscription keys come from
 [zoo.openzoo.fun/subscriptions](https://zoo.openzoo.fun/subscriptions)
 (`GET https://zoo.openzoo.fun/api/billing/tiers`). Tagline:
-**Subscription keys · no x402**.
+**Card first · x402 also works**.
 
 Play policy: digital subscriptions in a Play-distributed app must use
 **Google Play Billing**, not Stripe-in-webview.
@@ -22,31 +22,32 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 | App name | OpenZoo |
 | Widget id / applicationId | `fun.openzoo.android` |
 | Product | grokui: threads / chat / attach |
-| First-run | Google Play Billing paywall (before wallet) |
+| First-run | Play Billing plans first, x402 / wallet directly under them |
 | Plans | Basic $9 · Pro $29 (Most teams want this) · Ultra $99 |
 | Play SKUs | `fun.openzoo.android.sub.basic` / `.pro` / `.ultra` |
 | Gateway | `https://x402-tokens.fly.dev` |
-| Wallet | Phantom via MWA — **Settings only**, not first-run |
+| Wallet | Phantom via MWA + local burner — working x402 path, never a lock |
 
 ## How it works
 
 ```
 ┌──────────────────────────────────────┐
-│ www/index.html  (Play paywall shell) │
-│  • pick Basic / Pro / Ultra          │
-│  • Play Billing purchase / restore   │
-│  • exchange token → subscription key │
+│ www/index.html  (pay shell)          │
+│  • Play Billing Basic / Pro / Ultra  │
+│  • x402: Phantom MWA + local burner  │
+│  • Continue with x402 (no Play lock) │
 │  ┌────────────────────────────────┐  │
 │  │ iframe: www/app/               │  │
 │  │  grokui threads + chat         │  │
 │  │  attach files/folder/text      │  │
-│  │  Settings → optional Phantom   │  │
+│  │  New chat on the header        │  │
 │  └────────────────────────────────┘  │
 └──────────────────────────────────────┘
 ```
 
-First launch is the Play paywall. There is no CONNECT PHANTOM, no Chrome
-Stripe checkout, and no x402 wrap on that screen.
+First screen when they need to pay leads with the card / Play plans.
+x402 / wallet sits directly under them. A sideload without Play products
+must still enter and pay with x402. No Chrome Stripe checkout.
 
 After a Play purchase the app posts the purchase token to
 `POST https://zoo.openzoo.fun/api/billing/play`. That route is **not live
@@ -71,19 +72,19 @@ The UI never shows context ids, `/v1/bind`, bind hashes, or wrap-twin homework.
 
 Play Console must create the three monthly subscription product IDs above.
 
-## Optional crypto (Settings later)
+## x402 / wallet (the other working option)
 
 Addresses are selectable. Tap or select copies via Android ClipboardManager
-(toast **copied**; a local burner would say **copied local burner**).
+(toast **copied**; a local burner says **copied local burner**).
 
 x402 does not show raw WebView **Load failed**. A 402 is persisted while
 Phantom is in the foreground and retried on resume.
 
 Never open the HTTPS Phantom `/ul/` browse link. Custom scheme is
-`phantom://v1/<method>` only. MWA is the Play/Phantom payment path.
+`phantom://v1/<method>` only. MWA is the Phantom payment path. The local
+burner signs on-device (TweetNaCl) and never uses `/ul/`.
 
-Phantom / x402 wrap is **off by default** and lives behind Settings. If
-enabled later:
+x402 wrap is a working pay path, not a Settings-only afterthought:
 
 1. Live rails from `GET https://x402.accrue.fund/supported`
 2. Mint `FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B` is **wTOKENx2**
@@ -98,7 +99,7 @@ Do not call `:8402` or `/v1/session`.
 ```bash
 npm install -g cordova
 npm install
-npm test                 # rails + wrap + bind + billing + live smoke
+npm test                 # rails + wrap + bind + billing + clipboard + burner + live smoke
 cordova platform add android
 cordova requirements android
 cordova build android    # debug APK
@@ -112,9 +113,9 @@ Play Store install.
 
 Needs a **real Android 14+ phone** and Play Console products:
 
-1. First run shows Basic / Pro / Ultra — not Phantom, not Stripe
-2. Buy or restore a subscription in Google Play
-3. App enters grokui (key exchange may stay pending until `/api/billing/play` ships)
+1. First run shows Basic / Pro / Ultra first, then x402 / wallet under it
+2. Buy or restore a Play subscription **or** Continue with x402 / Phantom / burner
+3. Sideload / missing Play products still enters via x402
 4. Attach a short note and ask a question (no context id on screen)
 
 ## Release builds

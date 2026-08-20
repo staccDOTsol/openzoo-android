@@ -253,15 +253,18 @@ function read(rel) {
   return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
 }
 
-check("first-run is Play paywall, not Phantom or Stripe", () => {
+check("first-run is Play paywall first, with x402 escape", () => {
   const shell = read("www/index.html");
-  assert.match(shell, /Subscription keys · no x402/);
+  assert.match(shell, /Card first · x402 also works/);
   assert.match(shell, /Most teams want this/);
   assert.match(shell, /Restore purchases/);
   assert.match(shell, /play-paywall/);
-  assert.doesNotMatch(shell, /CONNECT PHANTOM/);
+  assert.match(shell, /x402-pay/);
+  assert.match(shell, /Continue with x402/);
+  assert.ok(shell.indexOf("play-paywall") < shell.indexOf("x402-pay"));
   assert.doesNotMatch(shell, /checkout\.stripe\.com/);
   assert.doesNotMatch(shell, /\/api\/billing\/checkout/);
+  assert.doesNotMatch(shell, /https:\/\/phantom\.app\/ul\//);
 });
 
 check("402 pay path partial-signs; wrap path may signAndSend", () => {

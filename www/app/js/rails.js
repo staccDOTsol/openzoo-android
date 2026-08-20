@@ -238,7 +238,7 @@
     var sym = (decision && decision.underlyingSymbol) || "TOKEN";
     return {
       title: "Wrap " + sym + " to send this?",
-      body: "Phantom will wrap a little " + sym + " so this message can send.",
+      body: "This wallet will wrap a little " + sym + " so this message can send.",
       confirm: "Wrap " + sym,
       symbol: sym,
     };

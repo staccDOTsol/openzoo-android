@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="fun.openzoo.android" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>OpenZoo</name>
-    <description>OpenZoo for Android 14+ — grokui on a phone. Google Play Billing subscriptions first (Basic/Pro/Ultra). Threads, chat, attach. Phantom/x402 is optional in Settings. Not the Seeker dApp store listing and not PSG1.</description>
+    <description>OpenZoo for Android 14+ — grokui on a phone. Card / Google Play Billing first (Basic/Pro/Ultra), x402 / wallet the other working option. Threads, chat, attach. Not the Seeker dApp store listing and not PSG1.</description>
     <author href="https://github.com/staccDOTsol/openzoo-android">
         staccDOTsol
     </author>
