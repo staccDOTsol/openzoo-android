@@ -523,8 +523,16 @@
       });
   }
 
-  $("newBtn").onclick = function () { newThread(); };
-  if ($("headerNewBtn")) $("headerNewBtn").onclick = function () { newThread(); };
+  function startNewChat() { newThread(); }
+  if ($("newBtn")) $("newBtn").onclick = startNewChat;
+  if ($("headerNewBtn")) $("headerNewBtn").onclick = startNewChat;
+  if ($("sideNewBtn")) {
+    $("sideNewBtn").onclick = function () {
+      startNewChat();
+      $("sidebar").classList.remove("open");
+      $("scrim").classList.remove("show");
+    };
+  }
   $("menuBtn").onclick = function () {
     $("sidebar").classList.add("open");
     $("scrim").classList.add("show");
