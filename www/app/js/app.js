@@ -4,6 +4,7 @@
   var R = window.OpenZooRails;
   var P = window.OpenZooPay;
   var B = window.OpenZooBind;
+  var S = window.OpenZooSpill;
   var $ = function (id) { return document.getElementById(id); };
   var STORE = "openzoo.android.grokui.v1";
   var PALETTE = ["#e91e8c", "#34c759", "#ff9500", "#5e5ce6", "#ff3b30", "#0a84ff", "#00c7be"];
@@ -14,7 +15,12 @@
   }
 
   var saved = loadStore();
-  var threads = Array.isArray(saved.threads) ? saved.threads : [];
+  var threads = (Array.isArray(saved.threads) ? saved.threads : []).map(function (t) {
+    if (!t || typeof t !== "object") return t;
+    if (t.boundPrefix == null) t.boundPrefix = "";
+    if (typeof t.direct !== "number") t.direct = 0;
+    return t;
+  });
   var activeId = saved.activeId || null;
   var busy = false;
 
@@ -55,10 +61,11 @@
       messages: [],
       items: [],
       ctx: null,
+      boundPrefix: "",
       corpus: "",
       model: $("model") ? $("model").value : "",
       spent: 0,
-      saved: 0,
+      direct: 0,
       calls: 0,
       updatedAt: Date.now(),
     };
@@ -166,6 +173,7 @@
     $("headAv").textContent = initials(t ? t.name : "OZ");
     $("headAv").style.background = t ? (t.color || colorFor(t.name)) : "#5e5ce6";
     if (t && t.model) $("model").value = t.model;
+    renderHud();
     if (!t || !t.messages.length) {
       bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.", false);
     } else {
@@ -188,7 +196,6 @@
       chip.querySelector("span").textContent = it.name || "note";
       chip.querySelector(".ax").onclick = function () {
         t.items.splice(i, 1);
-        t.ctx = null;
         t.corpus = B.corpusFromItems(t.items);
         persist();
         renderAttachChips();
@@ -210,8 +217,20 @@
 
   function planLabel() {
     var b = P.getBilling ? P.getBilling() : {};
-    if (b && b.tier) return (b.tier.charAt(0).toUpperCase() + b.tier.slice(1)) + (b.key ? " · key ready" : " · waiting on Play key exchange");
-    return "Play subscription";
+    var plan = "Play subscription";
+    if (b && b.tier) {
+      plan = (b.tier.charAt(0).toUpperCase() + b.tier.slice(1)) + (b.key ? " · key ready" : " · waiting on Play key exchange");
+    }
+    var t = active();
+    if (t && t.calls) return plan + "\n" + S.hudLabel(t);
+    return plan;
+  }
+
+  function renderHud() {
+    var el = $("hud");
+    if (!el) return;
+    var t = active();
+    el.textContent = t && (t.calls || t.spent) ? S.hudLabel(t) : "";
   }
 
   function openSettings() {
@@ -219,44 +238,98 @@
     $("planBody").textContent = planLabel();
   }
 
-  function postBind(corpus, contextId) {
+  function postBind(corpus, contextId, asTranscript) {
+    var body = asTranscript
+      ? R.transcriptBindPayload(corpus, contextId)
+      : R.bindPayload(corpus, contextId);
     return fetch(R.GATEWAY + "/v1/hrr/bind", {
       method: "POST",
       headers: R.gatewayHeaders(),
-      body: JSON.stringify(R.bindPayload(corpus, contextId)),
+      body: JSON.stringify(body),
     }).then(function (r) { return r.json(); });
+  }
+
+  function bindParts(parts, ctx, asTranscript) {
+    var i = 0;
+    function next() {
+      if (i >= parts.length) return ctx;
+      var part = parts[i++];
+      return postBind(part, ctx, asTranscript).then(function (d) {
+        if (d && d.context_id) ctx = d.context_id;
+        return next();
+      });
+    }
+    return next();
   }
 
   function bindThread(t) {
     var corpus = B.corpusFromItems(t.items);
     t.corpus = corpus;
     if (!corpus.trim()) {
-      t.ctx = null;
       persist();
-      return Promise.resolve(null);
+      return Promise.resolve(t.ctx);
     }
     var parts = B.splitIntoParts(corpus);
-    var ctx = null;
-    var i = 0;
-    function next() {
-      if (i >= parts.length) {
-        t.ctx = ctx;
-        persist();
-        return t.ctx;
-      }
-      var part = parts[i++];
-      return postBind(part, ctx).then(function (d) {
-        if (d && d.context_id) ctx = d.context_id;
-        return next();
-      });
-    }
+    var ctx = t.ctx || null;
     setStatus(t.items.length === 1 ? "attaching…" : "attaching " + t.items.length + " files…");
-    return next().then(function () {
+    return bindParts(parts, ctx, false).then(function (id) {
+      t.ctx = id;
+      persist();
       setStatus(B.userVisibleStatus(t.items, true));
       return t.ctx;
     }).catch(function (e) {
       setStatus(R.looksNetworkGarbage(e) ? R.friendlyNetworkMessage() : ("could not attach: " + ((e && e.message) || e)));
-      return null;
+      return t.ctx;
+    });
+  }
+
+  function bindTranscriptPrefix(t, prefix, force) {
+    var text = String(prefix || "").trim();
+    if (!text) return Promise.resolve(t.ctx);
+    var delta = force ? text : S.prefixDelta(t.boundPrefix, text);
+    if (!delta.trim()) return Promise.resolve(t.ctx);
+    var parts = B.splitIntoParts(delta);
+    var ctx = t.ctx || null;
+    var mustWait = !ctx;
+    var job = bindParts(parts, ctx, true).then(function (id) {
+      t.ctx = id;
+      t.boundPrefix = text;
+      persist();
+      return t.ctx;
+    }).catch(function () {
+      return t.ctx;
+    });
+    // First bind must land before the header can ride. Later deltas are
+    // history for the next turn — fire-and-forget like Claude CLI.
+    return mustWait ? job : (job.then(function () {}), Promise.resolve(t.ctx));
+  }
+
+  function prepareChat(t, model, opts) {
+    opts = opts || {};
+    var files = (t.items && t.items.length && (opts.force || !t.ctx))
+      ? bindThread(t)
+      : Promise.resolve(t.ctx);
+    return files.then(function () {
+      var draft = S.chatRequest({
+        system: R.SYSTEM_PROMPT,
+        messages: t.messages,
+        model: model,
+        maxTokens: R.maxTokensFor(model),
+        contextId: null,
+      });
+      var prefix = draft.prefix;
+      var needPrefix = !!(prefix && (opts.force || prefix !== t.boundPrefix || !t.ctx));
+      var bind = needPrefix ? bindTranscriptPrefix(t, prefix, opts.force) : Promise.resolve(t.ctx);
+      return bind.then(function () {
+        return S.chatRequest({
+          system: R.SYSTEM_PROMPT,
+          messages: t.messages,
+          model: model,
+          maxTokens: R.maxTokensFor(model),
+          contextId: t.ctx,
+          corpusChars: (t.boundPrefix || prefix || "").length,
+        });
+      });
     });
   }
 
@@ -299,35 +372,23 @@
     var thinking = bubble("…", false);
     thinking.innerHTML = "<span class=\"dots\"><span></span><span></span><span></span></span>";
 
-    function headersFor() {
-      var h = {};
-      if (t.ctx) h["x-hrr-context"] = t.ctx;
-      return h;
-    }
-
     var model = $("model").value || t.model || R.DEFAULT_MODEL;
     t.model = model;
-    var payload = {
-      model: model,
-      messages: [{ role: "system", content: R.SYSTEM_PROMPT }].concat(t.messages.map(function (m) {
-        return { role: m.role, content: m.content };
-      })),
-      max_tokens: R.maxTokensFor(model),
-    };
 
-    function runPaid() {
+    function runPaid(req) {
       return P.paidFetch("/v1/chat/completions", {
         method: "POST",
-        headers: headersFor(),
-        body: JSON.stringify(payload),
+        headers: req.headers,
+        body: JSON.stringify(req.payload),
       });
     }
 
-    var start = (t.items && t.items.length && !t.ctx) ? bindThread(t) : Promise.resolve(t.ctx);
-    start.then(function () {
-      return runPaid().catch(function (e) {
+    prepareChat(t, model).then(function (req) {
+      return runPaid(req).catch(function (e) {
         if (e && e.name !== "ContextNotFoundError") throw e;
-        return bindThread(t).then(function () { return runPaid(); });
+        t.ctx = null;
+        t.boundPrefix = "";
+        return prepareChat(t, model, { force: true }).then(runPaid);
       });
     }).then(function (r) { return r.json(); }).then(function (d) {
       var ch = d.choices && d.choices[0];
@@ -338,11 +399,13 @@
         content = (d.error && d.error.message) || "unusual reply";
       }
       thinking.textContent = content;
-      var billed = (d && d.billing) || {};
-      t.calls += 1;
-      if (typeof billed.billedUsd === "number") t.spent += billed.billedUsd;
+      S.noteSpend(t, S.receiptOf(d));
+      var rec = S.receiptOf(d);
       var bits = [];
-      if (typeof billed.billedUsd === "number") bits.push("$" + billed.billedUsd.toFixed(4));
+      if (typeof rec.billedUsd === "number") bits.push("$" + rec.billedUsd.toFixed(4));
+      else if (typeof rec.spentUsd === "number") bits.push("$" + rec.spentUsd.toFixed(4));
+      var x = S.hudSavingX(rec.directUsd, rec.billedUsd != null ? rec.billedUsd : rec.spentUsd);
+      if (x != null) bits.push(x.toFixed(1) + "×");
       var meta = bits.join(" · ");
       if (meta) {
         var m = document.createElement("div");
@@ -352,6 +415,7 @@
       }
       t.messages.push({ role: "assistant", content: content, meta: meta });
       persist();
+      renderHud();
       setStatus("");
     }).catch(function (e) {
       if (e && e.name === "SubscriptionRequiredError") {

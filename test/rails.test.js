@@ -67,6 +67,17 @@ check("no wallet / wrap / x402 pay path in shipped JS", () => {
   assert.match(pay, /402/);
 });
 
+check("chat spill is Claude-CLI style: prefix bind + tail, never full+header", () => {
+  const app = read("www/app/js/app.js");
+  const html = read("www/app/index.html");
+  const spill = read("www/app/js/spill.js");
+  assert.match(html, /js\/spill\.js/);
+  assert.match(spill, /full messages array/);
+  assert.match(app, /prepareChat/);
+  assert.match(app, /bindTranscriptPrefix/);
+  assert.doesNotMatch(spill, /function spawn|PING:|childKickoff|worktree/);
+});
+
 check("no @solana/web3.js dependency and no :8402", () => {
   const joined = [
     "www/index.html",
@@ -75,6 +86,7 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/pay.js",
     "www/app/js/rails.js",
     "www/app/js/bind.js",
+    "www/app/js/spill.js",
     "www/js/clipboard.js",
     "www/js/billing.js",
   ].map(read).join("\n");
