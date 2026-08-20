@@ -1,23 +1,22 @@
-# OpenZoo Android — Play Store / Phantom MWA
+# OpenZoo Android — grokui on a phone
 
 Generic **OpenZoo** for any Android 14+ phone with [Phantom](https://phantom.app/),
 shipped via Google Play. Apache Cordova shell + native Mobile Wallet Adapter
-(`cordova-plugin-mwa`) for connect and **`signTransaction`**.
+(`cordova-plugin-mwa`). This is the same product as the desktop grokui client:
+**threads, chat, wallet**, and **attach → bind behind the scenes**.
 
 This is **not** the Seeker dApp store (`fun.openzoo.seeker`) and **not** PSG1
 (`fun.openzoo.psg1`). Stay on this Cordova + MWA tree — do not rewrite to
-Capacitor, and do not push to FreeSolDev.
+Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 
 | | |
 |---|---|
 | App name | OpenZoo |
 | Widget id / applicationId | `fun.openzoo.android` |
-| Product | chat + bind + stats |
+| Product | grokui: threads / chat / wallet / attach |
 | Gateway | `https://x402-tokens.fly.dev` |
-| Wallet | Phantom via MWA (`signTransaction` only — never `signAndSend`) |
-
-See [`HANDOFF_OPENZOO_ANDROID.md`](HANDOFF_OPENZOO_ANDROID.md) for identity and
-scope. Payment facts were checked live against the gateway (2026-08-17 / 2026-08-20).
+| Rails | live `GET https://x402.accrue.fund/supported` |
+| Wallet | Phantom via MWA |
 
 ## How it works
 
@@ -25,67 +24,51 @@ scope. Payment facts were checked live against the gateway (2026-08-17 / 2026-08
 ┌─────────────────────────────────┐
 │ www/index.html  (wallet shell)  │
 │  • MWA native connect (Phantom) │
-│  • signTransaction bridge       │
+│  • signTransaction  → 402 pay   │
+│  • signAndSend      → wrap only │
 │  ┌───────────────────────────┐  │
 │  │ iframe: www/app/          │  │
-│  │  chat / bind / stats      │  │
-│  │  402 → pay/build → sign   │  │
+│  │  grokui threads + chat    │  │
+│  │  attach files/folder/text │  │
 │  └───────────────────────────┘  │
 └─────────────────────────────────┘
 ```
 
-The shell owns all wallet state; the UI never touches keys and never builds a
-Solana transaction. There is no `@solana/web3.js` / `@solana/spl-token` in the
-webview.
+The shell owns all wallet state. The UI never touches keys.
 
-## Payment
+Bind is **abstract**: the user attaches files, a folder, or pasted text. The
+app binds a corpus behind the scenes. The UI never shows context ids, `/v1/bind`,
+bind hashes, or wrap-twin homework.
 
-1. `POST https://x402-tokens.fly.dev/v1/chat/completions` → **402**
-2. Pick a payable **Solana** `accepts[]` row (ignore `eip155` on Android)
-3. Probe balances with JSON-RPC `getTokenAccountsByOwner` (no web3.js)
-4. Prefer the live Solana `accepts[]` row (by `extra.symbol`) in order
-   yUSDCx → wTOKENx → wLEOSx. Probe that row's `asset` mint. Plain USDC
-   (`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`) is never an `accepts[]`
-   row; `/v1/pay/build` does not wrap.
-5. `POST /v1/pay/build` `{ accept, payer }` → unsigned tx + envelope
-6. Shell: **`MWA.signTransaction(txB64)` only**
-7. Retry the completion with
-   `X-PAYMENT: base64({ ...envelope, payload: { transaction: "<signed>" } })`
+## Payment + top-up
 
-Payment is the auth — any `Authorization` string is accepted. Requests also
-send `x-openzoo-namespace: stacc` (unsigned soft-launch).
+1. Live rails from `GET https://x402.accrue.fund/supported` (not a stale allowlist).
+2. Mint `FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B` is **wTOKENx2**.
+   It replaces the drained mint `Bo7xBF7SY8EyUBPUxRP66SFafxoPf2n5uqiLjbxEebx9`,
+   which is hidden if a 402 still quotes it. Do not label FXYkw… as wTOKENx.
+3. Look at what Phantom actually holds (USDC, TOKEN, LEOS, or a live twin).
+   If a twin is short, wrap via wrap-nav
+   `FrSERTNCPvTtaDS9AvQp9u1nYGzXDb3kC9MdL8Xxn2NE` using the directory `acquire`
+   steps. wTOKENx2 wrap is **nine accounts, bump 254**; the program pulls the
+   deposit.
+4. **402 pay tx:** user partial-signs (`MWA.signTransaction`). Do not broadcast
+   — the facilitator stays the fee-payer.
+5. **Wrap tx:** may `MWA.signAndSendTransaction`.
 
-A wallet that only holds regular USDC cannot pay. The app **steers** instead
-of retrying into a silent simulation failure:
+A wallet that only holds regular USDC or TOKEN is topped up in-app. The user
+is not sent to wrap homework. If Phantom has no SOL for the top-up, the app
+says it needs a little SOL — nothing about twins.
 
-> This app pays with USDC on Solana. If your Phantom wallet only has regular
-> USDC, open https://x402.accrue.fund/start to wrap it, then come back.
+Payment is the auth. Requests also send `x-openzoo-namespace: stacc`.
 
-That URL opens in the system browser. There is **no on-device wrap** in v1.
-
-If the balance probe itself fails, the app tries the live yUSDCx → wTOKENx →
-wLEOSx rows and shows the same steer panel when settlement looks underfunded.
-
-## Bind + stats
-
-- Bind (free): `POST /v1/hrr/bind` `{ corpus }` or
-  `{ items:[{ text }], context_id? }` → `{ context_id, bound }`. Later chats
-  send `x-hrr-context` (optional `x-hrr-top-k`). A chat `404` with
-  `error.code = context_not_found` re-binds for free **before** paying.
-- Stats: `GET /v1/stats` only (`app`, `today`, `days[]`, `growth`,
-  `topModels[]`, `coverage`). Do not call `/v1/session` or anything on `:8402`.
-- Models: `GET /v1/models`. Default is `google/gemini-3.7-flash` when present.
-  Do not use a fake `openzoo` model id.
-
-This app is chat + bind + stats only. It does not implement desktop RUN /
-WRITE / READ / SERVE, and the system prompt says so.
+Do not call `:8402` or `/v1/session`.
 
 ## Build
 
 ```bash
 npm install -g cordova
 npm install
-npm test                 # rail picker + live gateway smoke (no wallet)
+npm test                 # rails + wrap + bind + live gateway smoke (no wallet)
 cordova platform add android
 cordova requirements android
 cordova build android    # debug APK
@@ -94,24 +77,17 @@ cordova build android    # debug APK
 Requirements: Android SDK + JDK 17. Widget / Gradle `applicationId` comes from
 `config.xml` (`fun.openzoo.android`).
 
-Debug APK path after a successful Cordova build (typical):
+### Remaining device test
 
-`platforms/android/app/build/outputs/apk/debug/app-debug.apk`
-
-### Remaining device test (cannot be done in a browser or emulator)
-
-MWA needs a **real Android 14+ phone with Phantom installed**. An emulator is
-not enough.
+MWA needs a **real Android 14+ phone with Phantom installed**.
 
 On device:
 
-1. Connect Phantom via the shell (`CONNECT PHANTOM`)
-2. Send a completion — Phantom should prompt to **sign** (not send) a tx
-3. Bind a short corpus and ask a question against it
-4. Open stats
-5. With a USDC-only wallet, confirm the wrap steer panel (plain “USDC on
-   Solana” copy, wrap page in the system browser) — not a raw RPC / simulation
-   error
+1. Connect Phantom
+2. Send a completion — Phantom should prompt to **sign** (not send) a pay tx
+3. Attach a short note and ask a question against it (no context id on screen)
+4. With USDC- or TOKEN-only, confirm the in-app top-up (sign-and-send wrap),
+   then the pay sign
 
 ## Release builds
 

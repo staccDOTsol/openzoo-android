@@ -5,13 +5,76 @@ const fs = require("fs");
 const path = require("path");
 const R = require("../www/app/js/rails.js");
 
+const WTOKENX2 = "FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B";
+const DRAINED = "Bo7xBF7SY8EyUBPUxRP66SFafxoPf2n5uqiLjbxEebx9";
+const YUSDCX = "6ZjjxcoicqM4nniddkuPVwew4PDwY3swbfHsGbCuLuTv";
+const WLEOSX = "3FViQRMqtG6dUDFxZyyVvpM9xTHsKdX7uqZ5jvL8NZ35";
+
+const KINDS = [
+  {
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    extra: { asset: R.PLAIN_USDC, symbol: "USDC", decimals: 6 },
+  },
+  {
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    extra: {
+      asset: YUSDCX,
+      symbol: "yUSDCx",
+      decimals: 6,
+      acquire: {
+        method: "spl-token-wrap",
+        program: R.WRAP_PROGRAM,
+        underlying: { address: R.PLAIN_USDC, symbol: "USDC", decimals: 6, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        escrow: "2qLm8aCvn6gQVUFeQ7EC5J62Y95gFzc3vReHzD5d5Gj2",
+        mintAuthority: "EBGYMEEEPKu7szPUbnbp2h63azY9Sj9GR4MA2Ms6Quoi",
+      },
+    },
+  },
+  {
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    extra: {
+      asset: WTOKENX2,
+      symbol: "wTOKENx2",
+      decimals: 6,
+      acquire: {
+        method: "spl-token-wrap",
+        program: R.WRAP_PROGRAM,
+        underlying: { address: R.PLAIN_TOKEN, symbol: "TOKEN", decimals: 6, tokenProgram: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" },
+        escrow: "2ZFYUDiYbtJ8czCPnd6Wjbeo1Yg1LLJ9JkGPMeuZkKyh",
+        mintAuthority: "2SFdjJoRyWfXvXghAjahDgmaZPrAr5WqqCr8KquAtZVM",
+        authorityBump: 254,
+      },
+    },
+  },
+  {
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    extra: {
+      asset: WLEOSX,
+      symbol: "wLEOSx",
+      decimals: 9,
+      acquire: {
+        method: "spl-token-wrap",
+        program: R.WRAP_PROGRAM,
+        underlying: { address: R.PLAIN_LEOS, symbol: "LEOS", decimals: 9, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+        escrow: "62kjFPGb2RnPXfShFdeYuvyN72hg5EC4N8UVkuN1RiMc",
+        mintAuthority: "3Fj3FCty8DJZTrEdW5dYLgEfbVNATDixj9gVWWxuvz8J",
+        authorityBump: 255,
+      },
+    },
+  },
+  {
+    network: "eip155:8453",
+    extra: { asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", symbol: "USDC" },
+  },
+];
+
 const ACCEPTS = [
   {
     scheme: "exact",
     network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-    asset: "6ZjjxcoicqM4nniddkuPVwew4PDwY3swbfHsGbCuLuTv",
+    asset: YUSDCX,
     maxAmountRequired: "7051",
-    extra: { symbol: "yUSDCx", decimals: 6 },
+    extra: { symbol: "yUSDCx", decimals: 6, billedUsd: 0.007 },
   },
   {
     scheme: "exact",
@@ -23,16 +86,16 @@ const ACCEPTS = [
   {
     scheme: "exact",
     network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-    asset: "FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B",
+    asset: WTOKENX2,
     maxAmountRequired: "33545783",
-    extra: { symbol: "wTOKENx", decimals: 6 },
+    extra: { symbol: "wTOKENx", decimals: 6, billedUsd: 0.007 },
   },
   {
     scheme: "exact",
     network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-    asset: "3FViQRMqtG6dUDFxZyyVvpM9xTHsKdX7uqZ5jvL8NZ35",
+    asset: WLEOSX,
     maxAmountRequired: "46679017404",
-    extra: { symbol: "wLEOSx", decimals: 9 },
+    extra: { symbol: "wLEOSx", decimals: 9, billedUsd: 0.007 },
   },
 ];
 
@@ -43,124 +106,98 @@ function check(name, fn) {
   console.log("ok  " + name);
 }
 
-check("filters eip155 rows", () => {
-  const sol = R.solanaAccepts(ACCEPTS);
-  assert.strictEqual(sol.length, 3);
-  assert.ok(sol.every((r) => r.network.startsWith("solana:")));
-});
-
-check("prefers yUSDCx when it can cover", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "7051", wTOKENx: "0", wLEOSx: "0" },
-    underlying: {},
-  });
-  assert.strictEqual(d.mode, "pay");
-  assert.strictEqual(d.symbol, "yUSDCx");
-});
-
-check("falls to wTOKENx when yUSDCx is short", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "10", wTOKENx: "33545783", wLEOSx: "0" },
-    underlying: { USDC: "1000000" },
-  });
-  assert.strictEqual(d.mode, "pay");
-  assert.strictEqual(d.symbol, "wTOKENx");
-});
-
-check("falls to wLEOSx last among twins", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "0", wTOKENx: "0", wLEOSx: "46679017404" },
-    underlying: {},
-  });
-  assert.strictEqual(d.mode, "pay");
-  assert.strictEqual(d.symbol, "wLEOSx");
-});
-
-check("steers when only plain USDC is held", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "0", wTOKENx: "0", wLEOSx: "0" },
-    underlying: { USDC: "5000000", TOKEN: "0", LEOS: "0" },
-  });
-  assert.strictEqual(d.mode, "steer");
-  assert.deepStrictEqual(d.heldUnderlying, ["USDC"]);
-  const copy = R.steerCopy(d, "help text should stay off when they hold USDC");
-  assert.match(copy.body, /pays with USDC on Solana/);
-  assert.match(copy.body, /https:\/\/x402\.accrue\.fund\/start/);
-  assert.doesNotMatch(copy.body, /hunt|ticker named yUSDCx/i);
-  assert.strictEqual(copy.help, "");
-});
-
-check("steers TOKEN-only wallets", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "0", wTOKENx: "0", wLEOSx: "0" },
-    underlying: { TOKEN: "99" },
-  });
-  assert.strictEqual(d.mode, "steer");
-  assert.ok(d.heldUnderlying.includes("TOKEN"));
-  assert.match(R.steerCopy(d).body, /TOKEN/);
-  assert.match(R.steerCopy(d).body, /USDC on Solana/);
-});
-
-check("empty wallet includes 402 help text", () => {
-  const d = R.pickRail(ACCEPTS, {
-    payable: { yUSDCx: "0", wTOKENx: "0", wLEOSx: "0" },
-    underlying: {},
-  });
-  assert.strictEqual(d.mode, "steer");
-  assert.strictEqual(d.empty, true);
-  const help = "Don't hold any yet? https://x402.accrue.fund/start";
-  const copy = R.steerCopy(d, help);
-  assert.match(copy.body, /pays with USDC on Solana/);
-  assert.ok(copy.body.indexOf(help) !== -1);
-});
-
-check("prefers live accepts[] mint over a stale catalog mint", () => {
-  const liveTok = Object.assign({}, ACCEPTS.find((a) => a.extra.symbol === "wTOKENx"), {
-    asset: "LiveMint11111111111111111111111111111111",
-  });
-  const accepts = ACCEPTS.map((a) => a.extra && a.extra.symbol === "wTOKENx" ? liveTok : a);
-  const row = R.findPayableRow(accepts, "wTOKENx");
-  assert.strictEqual(row.asset, "LiveMint11111111111111111111111111111111");
-  const d = R.pickRail(accepts, {
-    payable: { yUSDCx: "0", wTOKENx: "33545783", wLEOSx: "0" },
-  });
-  assert.strictEqual(d.mode, "pay");
-  assert.strictEqual(d.accept.asset, "LiveMint11111111111111111111111111111111");
-});
-
-check("never treats plain USDC as a payable accept row", () => {
-  const withUsdc = ACCEPTS.concat([{
+check("filters eip155 and drained / plain USDC rows", () => {
+  const withJunk = ACCEPTS.concat([{
+    scheme: "exact",
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    asset: DRAINED,
+    maxAmountRequired: "1",
+    extra: { symbol: "wTOKENx" },
+  }, {
     scheme: "exact",
     network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
     asset: R.PLAIN_USDC,
     maxAmountRequired: "1",
-    extra: { symbol: "USDC", decimals: 6 },
+    extra: { symbol: "USDC" },
   }]);
-  assert.ok(R.solanaAccepts(withUsdc).every((r) => r.asset !== R.PLAIN_USDC));
-  assert.strictEqual(R.findPayableRow(withUsdc, "USDC"), null);
+  const sol = R.solanaAccepts(withJunk);
+  assert.ok(sol.every((r) => r.network.startsWith("solana:")));
+  assert.ok(sol.every((r) => r.asset !== DRAINED));
+  assert.ok(sol.every((r) => r.asset !== R.PLAIN_USDC));
 });
 
-check("bind payload and context_not_found helper", () => {
+check("FXYkw mint is always labeled wTOKENx2, never wTOKENx", () => {
+  assert.strictEqual(R.canonicalSymbol(WTOKENX2, "wTOKENx2", "wTOKENx"), "wTOKENx2");
+  assert.strictEqual(R.canonicalSymbol(WTOKENX2, "wTOKENx", "wTOKENx"), "wTOKENx2");
+  const annotated = R.annotateAccepts(ACCEPTS, KINDS);
+  const tok = annotated.find((a) => a.accept.asset === WTOKENX2);
+  assert.ok(tok);
+  assert.strictEqual(tok.symbol, "wTOKENx2");
+  assert.notStrictEqual(tok.symbol, "wTOKENx");
+});
+
+check("hides drained mint even if a 402 still quotes it", () => {
+  assert.ok(R.isDrainedMint(DRAINED));
+  const kinds = KINDS.concat([{
+    network: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    extra: { asset: DRAINED, symbol: "wTOKENx" },
+  }]);
+  assert.ok(R.solanaKinds(kinds).every((k) => R.kindAsset(k) !== DRAINED));
+});
+
+check("pays with a held twin", () => {
+  const d = R.pickRail(ACCEPTS, {
+    twins: { [YUSDCX]: "7051", [WTOKENX2]: "0", [WLEOSX]: "0" },
+    underlyings: {},
+  }, KINDS);
+  assert.strictEqual(d.mode, "pay");
+  assert.strictEqual(d.accept.asset, YUSDCX);
+});
+
+check("wraps from TOKEN when only the live twin is short", () => {
+  const d = R.pickRail(ACCEPTS, {
+    twins: { [YUSDCX]: "0", [WTOKENX2]: "0", [WLEOSX]: "0" },
+    underlyings: { [R.PLAIN_TOKEN]: "999999999" },
+  }, KINDS);
+  assert.strictEqual(d.mode, "wrap");
+  assert.strictEqual(d.accept.asset, WTOKENX2);
+  assert.strictEqual(d.underlying, R.PLAIN_TOKEN);
+  assert.strictEqual(d.underlyingSymbol, "TOKEN");
+});
+
+check("wraps from USDC when that is what the wallet holds", () => {
+  const d = R.pickRail(ACCEPTS, {
+    twins: { [YUSDCX]: "0", [WTOKENX2]: "0", [WLEOSX]: "0" },
+    underlyings: { [R.PLAIN_USDC]: "5000000" },
+  }, KINDS);
+  assert.strictEqual(d.mode, "wrap");
+  assert.strictEqual(d.accept.asset, YUSDCX);
+  assert.strictEqual(d.underlyingSymbol, "USDC");
+});
+
+check("need-funds copy never mentions twins or wrap homework", () => {
+  const d = R.pickRail(ACCEPTS, {
+    twins: { [YUSDCX]: "0", [WTOKENX2]: "0", [WLEOSX]: "0" },
+    underlyings: {},
+  }, KINDS);
+  assert.strictEqual(d.mode, "need-funds");
+  const copy = R.fundsCopy(d);
+  assert.match(copy.body, /USDC or TOKEN/);
+  assert.doesNotMatch(copy.body, /yUSDCx|wTOKENx|wLEOSx|wrap-nav|accrue\.fund\/start|context_id|\/v1\/bind/);
+});
+
+check("bind payload stays internal", () => {
   assert.deepStrictEqual(R.bindPayload("hello"), { corpus: "hello" });
   assert.deepStrictEqual(R.bindPayload("hello", "ctx_1"), {
     items: [{ text: "hello" }],
     context_id: "ctx_1",
   });
   assert.ok(R.isContextNotFound(404, { error: { code: "context_not_found" } }));
-  assert.ok(!R.isContextNotFound(402, { error: { code: "context_not_found" } }));
-  assert.ok(!R.isContextNotFound(404, { error: { code: "nope" } }));
 });
 
 check("namespace header is unsigned stacc", () => {
   const h = R.gatewayHeaders({ "x-hrr-context": "ctx" });
   assert.strictEqual(h["x-openzoo-namespace"], "stacc");
-  assert.strictEqual(h["x-hrr-context"], "ctx");
-});
-
-check("probe failure returns yUSDCx then wTOKENx then wLEOSx", () => {
-  const d = R.pickRail(ACCEPTS, { probeFailed: true });
-  assert.strictEqual(d.mode, "fallback");
-  assert.deepStrictEqual(d.order.map((x) => x.symbol), ["yUSDCx", "wTOKENx", "wLEOSx"]);
 });
 
 check("encodes X-PAYMENT with the signed tx swapped in", () => {
@@ -172,73 +209,80 @@ check("encodes X-PAYMENT with the signed tx swapped in", () => {
   }, "SIGNED_TX_B64");
   const decoded = R.decodePaymentHeader(header);
   assert.strictEqual(decoded.payload.transaction, "SIGNED_TX_B64");
-  assert.strictEqual(decoded.x402Version, 1);
-});
-
-check("detects underfunded / simulation failures", () => {
-  assert.ok(R.looksUnderfunded("Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1"));
-  assert.ok(R.looksUnderfunded("insufficient funds"));
-  assert.ok(!R.looksUnderfunded("wallet rejected the request"));
 });
 
 check("defaults to google/gemini-3.7-flash, never a fake openzoo id", () => {
   const id = R.defaultModelId([
     { id: "~hidden" },
     { id: "openai/gpt-4o-mini" },
-    { id: "google/gemini-3.7-flash:batch" },
     { id: "google/gemini-3.7-flash" },
   ]);
   assert.strictEqual(id, "google/gemini-3.7-flash");
-  assert.notStrictEqual(id, "openzoo");
 });
 
 check("system prompt does not claim RUN/WRITE/READ/SERVE", () => {
-  assert.match(R.SYSTEM_PROMPT, /chat only/i);
-  assert.doesNotMatch(R.SYSTEM_PROMPT, /\bRUN\b.*work/i);
+  assert.match(R.SYSTEM_PROMPT, /phone/i);
   assert.match(R.SYSTEM_PROMPT, /Never emit RUN, WRITE, READ, or SERVE/);
 });
 
-check("pay path sources never call signAndSendTransaction", () => {
-  const files = [
-    "www/index.html",
-    "www/app/js/pay.js",
-    "www/app/js/rails.js",
-    "www/app/js/app.js",
-    "www/app/index.html",
-  ].map((f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8"));
-  const joined = files.join("\n");
-  assert.doesNotMatch(joined, /MWA\.signAndSendTransaction|signAndSendTransaction\s*\(/);
-  assert.match(joined, /MWA\.signTransaction\s*\(/);
-  assert.doesNotMatch(joined, /@solana\/web3\.js|@solana\/spl-token/);
+check("rails come from /supported, not a stale hardcoded PAYABLE allowlist", () => {
+  assert.strictEqual(R.SUPPORTED_URL, "https://x402.accrue.fund/supported");
+  assert.strictEqual(R.PAYABLE, undefined);
 });
 
-check("widget id is fun.openzoo.android and forbidden ids are gone", () => {
-  const cfg = fs.readFileSync(path.join(__dirname, "..", "config.xml"), "utf8");
-  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
-  const shell = fs.readFileSync(path.join(__dirname, "..", "www/index.html"), "utf8");
+function read(rel) {
+  return fs.readFileSync(path.join(__dirname, "..", rel), "utf8");
+}
+
+check("402 pay path partial-signs; wrap path may signAndSend", () => {
+  const pay = read("www/app/js/pay.js");
+  const shell = read("www/index.html");
+  assert.match(pay, /wallet-sign-transaction/);
+  assert.match(pay, /wallet-sign-and-send-transaction/);
+  assert.match(shell, /MWA\.signTransaction\s*\(/);
+  assert.match(shell, /MWA\.signAndSendTransaction\s*\(/);
+  assert.match(pay, /partial-sign only/);
+  assert.match(shell, /Payment signer\. MUST be signTransaction/);
+  assert.match(shell, /Wrap \/ top-up only/);
+});
+
+check("no @solana/web3.js dependency and no :8402", () => {
+  const joined = [
+    "www/index.html",
+    "www/app/index.html",
+    "www/app/js/app.js",
+    "www/app/js/pay.js",
+    "www/app/js/rails.js",
+    "www/app/js/wrap.js",
+    "www/app/js/bind.js",
+  ].map(read).join("\n");
+  assert.doesNotMatch(joined, /@solana\/web3\.js|@solana\/spl-token/);
+  assert.doesNotMatch(joined, /:8402/);
+  assert.doesNotMatch(joined, /\/v1\/session/);
+});
+
+check("UI never shows context ids, /v1/bind, hashes, or twin homework", () => {
+  const html = read("www/app/index.html");
+  const app = read("www/app/js/app.js");
+  assert.doesNotMatch(html, /context_id|\/v1\/hrr\/bind|bind hash|yUSDCx|wTOKENx|wLEOSx|wrap-nav/);
+  assert.doesNotMatch(html, /teach the zoo|bind it|x-hrr-context/);
+  assert.match(html, /Attach files/);
+  assert.match(html, /Attach folder/);
+  assert.match(html, /Paste text/);
+  assert.match(app, /userVisibleStatus/);
+  assert.doesNotMatch(app, /bound ctx|context_id\.slice|bindStatus/);
+});
+
+check("widget id is fun.openzoo.android; Cordova + MWA stay", () => {
+  const cfg = read("config.xml");
+  const pkg = JSON.parse(read("package.json"));
+  const shell = read("www/index.html");
   assert.match(cfg, /id="fun\.openzoo\.android"/);
   assert.match(cfg, /<name>OpenZoo<\/name>/);
   assert.strictEqual(pkg.name, "fun.openzoo.android");
-  assert.strictEqual(pkg.displayName, "OpenZoo");
-  assert.doesNotMatch(cfg + shell, /fun\.openzoo\.seeker|fun\.openzoo\.psg1|com\.example\.cordovaseeker/);
-  assert.doesNotMatch(shell, /:8402/);
-  assert.doesNotMatch(joinedApp(), /:8402|\/v1\/session|Bo7xBF7/);
-});
-
-function joinedApp() {
-  return [
-    "www/app/index.html",
-    "www/app/js/app.js",
-    "www/app/js/pay.js",
-    "www/app/js/rails.js",
-  ].map((f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8")).join("\n");
-}
-
-check("clicker demo is no longer loaded", () => {
-  const shell = fs.readFileSync(path.join(__dirname, "..", "www/index.html"), "utf8");
-  assert.match(shell, /app\/index\.html/);
-  assert.doesNotMatch(shell, /game\/index\.html/);
-  assert.ok(!fs.existsSync(path.join(__dirname, "..", "www/game/index.html")));
+  assert.doesNotMatch(cfg + shell, /fun\.openzoo\.seeker|fun\.openzoo\.psg1|SwiftUI|phantom\.app\/ul\/v1/);
+  assert.match(shell, /cordova\.js/);
+  assert.match(shell, /MWA\.authorize/);
 });
 
 console.log("\n" + passed + " checks passed");

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="fun.openzoo.android" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>OpenZoo</name>
-    <description>OpenZoo for Android 14+ with Phantom — chat, bind, and stats. You pay each model call from your own wallet via Mobile Wallet Adapter and x402. Not the Seeker dApp store listing and not PSG1.</description>
+    <description>OpenZoo for Android 14+ with Phantom — grokui on a phone: threads, chat, wallet, attach. You pay each model call from your own wallet via Mobile Wallet Adapter and x402. Not the Seeker dApp store listing and not PSG1.</description>
     <author href="https://github.com/staccDOTsol/openzoo-android">
         staccDOTsol
     </author>

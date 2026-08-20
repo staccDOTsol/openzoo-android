@@ -78,7 +78,7 @@
     <img src="img/token.jpg" alt="OpenZoo">
   </div>
   <div class="title" data-component="title">OPENZOO</div>
-  <p class="sub">Chat + bind + stats. You pay each call from your Phantom wallet via Mobile Wallet Adapter.</p>
+  <p class="sub">Threads, chat, and wallet — same product as grokui, on your phone. Each call is paid from Phantom via Mobile Wallet Adapter.</p>
   <div class="divider"></div>
 
   <div id="picker" data-component="wallet-picker">
@@ -273,6 +273,30 @@
         );
       } else {
         respondTx({ error: 'No wallet connected' });
+      }
+    }
+
+    // Wrap / top-up only. The user is the fee-payer and the wallet may broadcast.
+    if (data.type === 'wallet-sign-and-send-transaction') {
+      log('Sign-and-send request (wrap) — id:' + data.id);
+      var respondSend = function(payload) {
+        payload.type = 'wallet-sign-and-send-transaction-response';
+        payload.id = data.id;
+        gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
+      };
+      if (connectedMethod === 'MWA' && window.MWA) {
+        MWA.signAndSendTransaction(data.transaction,
+          function(result) {
+            log('Signed and sent wrap (MWA)');
+            respondSend({ signature: result.signature });
+          },
+          function(err) {
+            log('Sign-and-send failed: ' + err);
+            respondSend({ error: err });
+          }
+        );
+      } else {
+        respondSend({ error: 'No wallet connected' });
       }
     }
   });
