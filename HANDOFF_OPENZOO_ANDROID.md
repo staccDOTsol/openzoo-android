@@ -76,7 +76,7 @@ Do not invent a second key system.
 
 Cordova `<content src="index.html">` is the **Play paywall**, not a wallet
 landing (that iOS pattern does not apply here). After purchase / restore /
-DEBUG unlock it iframes `www/app/index.html` (chat). Do not retarget
+a stored entitlement it iframes `www/app/index.html` (chat). Do not retarget
 `content src` at the chat page — that would skip first-run Play Billing.
 
 ```
