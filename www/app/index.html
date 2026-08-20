@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
+  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
 <title>openzoo</title>
 <style>
   :root { color-scheme: dark; }
@@ -85,11 +85,11 @@
   #send svg { width: 16px; height: 16px; }
   #menuBtn { display: none; }
   #scrim { display: none; }
-  #walletOverlay, #pasteOverlay, #fundsOverlay {
+  #walletOverlay, #pasteOverlay, #fundsOverlay, #settingsOverlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.66); z-index: 80;
     display: none; align-items: flex-end; justify-content: center;
   }
-  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show { display: flex; }
+  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show, #settingsOverlay.show { display: flex; }
   .sheet { width: 100%; max-width: 560px; max-height: 82vh; overflow-y: auto; background: #111113;
            border: 1px solid #2c2c2e; border-radius: 16px 16px 0 0; padding: 20px 18px 24px; }
   .sheet h3 { margin: 0 0 6px; font-size: 15px; }
@@ -139,7 +139,7 @@
       <div id="headerDials">
         <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
         <datalist id="modelList"></datalist>
-        <button class="dial" id="walletBtn" type="button">wallet</button>
+        <button class="dial" id="settingsBtn" type="button">settings</button>
       </div>
     </div>
     <div id="log"></div>
@@ -167,13 +167,31 @@
     </div>
   </div>
 
+  <div id="settingsOverlay">
+    <div class="sheet">
+      <h3>Settings</h3>
+      <p class="wsub">Google Play subscription first. Phantom / x402 is optional and off by default.</p>
+      <div id="planBody" class="wbal">loading plan…</div>
+      <div class="actions">
+        <button class="ghost" id="changePlanBtn" type="button">Change plan</button>
+      </div>
+      <h3 style="margin-top:18px">Phantom (optional)</h3>
+      <p class="tiny">Crypto wrap stays here for later. It is not how you start the app.</p>
+      <div id="walletBody" class="wbal">not connected</div>
+      <div class="actions">
+        <button class="ghost" id="connectWalletBtn" type="button">Connect Phantom</button>
+        <button class="ghost" id="leaveBtn" type="button">disconnect</button>
+        <button class="ghost" id="settingsClose" type="button">close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="walletOverlay">
     <div class="sheet">
-      <h3>Your wallet</h3>
-      <p class="wsub">This is your Phantom wallet on this phone. The app pays each call from it. Public address only — the UI never shows a key.</p>
-      <div id="walletBody">loading…</div>
+      <h3>Phantom</h3>
+      <p class="wsub">Optional. Public address only.</p>
+      <div id="walletDetail">not connected</div>
       <div class="actions">
-        <button class="ghost" id="leaveBtn" type="button">leave</button>
         <button class="ghost" id="walletClose" type="button">close</button>
       </div>
     </div>

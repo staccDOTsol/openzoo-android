@@ -2,13 +2,14 @@
   "name": "fun.openzoo.android",
   "displayName": "OpenZoo",
   "version": "1.0.0",
-  "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone (threads, chat, wallet, attach). Paid from Phantom via Mobile Wallet Adapter and x402.",
+  "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone. Play Billing subscriptions first; Phantom/x402 is optional.",
   "main": "index.js",
   "scripts": {
-    "test": "node test/rails.test.js && node test/wrap.test.js && node test/bind.test.js && node test/smoke-gateway.js",
+    "test": "node test/rails.test.js && node test/wrap.test.js && node test/bind.test.js && node test/billing.test.js && node test/smoke-gateway.js",
     "test:rails": "node test/rails.test.js",
     "test:wrap": "node test/wrap.test.js",
     "test:bind": "node test/bind.test.js",
+    "test:billing": "node test/billing.test.js",
     "test:gateway": "node test/smoke-gateway.js",
     "build": "cordova build android",
     "build:release": "cordova build android --release",
@@ -33,14 +34,16 @@
   "license": "MIT",
   "devDependencies": {
     "cordova-android": "^14.0.1",
-    "cordova-plugin-mwa": "file:cordova-plugin-mwa"
+    "cordova-plugin-mwa": "file:cordova-plugin-mwa",
+    "cordova-plugin-play-billing": "file:cordova-plugin-play-billing"
   },
   "cordova": {
     "platforms": [
       "android"
     ],
     "plugins": {
-      "cordova-plugin-mwa": {}
+      "cordova-plugin-mwa": {},
+      "cordova-plugin-play-billing": {}
     }
   }
 }

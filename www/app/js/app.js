@@ -167,7 +167,7 @@
     $("headAv").style.background = t ? (t.color || colorFor(t.name)) : "#5e5ce6";
     if (t && t.model) $("model").value = t.model;
     if (!t || !t.messages.length) {
-      bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files.", false);
+      bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.", false);
     } else {
       t.messages.forEach(function (m) {
         bubble(m.content, m.role === "user", m.meta || "");
@@ -225,26 +225,17 @@
     return n >= 1 ? n.toFixed(2) : n.toPrecision(3);
   }
 
-  function openWallet() {
-    $("walletOverlay").classList.add("show");
-    var body = $("walletBody");
+  function planLabel() {
+    var b = P.getBilling ? P.getBilling() : {};
+    if (b && b.tier) return (b.tier.charAt(0).toUpperCase() + b.tier.slice(1)) + (b.key ? " · key ready" : " · waiting on Play key exchange");
+    return "Play subscription";
+  }
+
+  function openSettings() {
+    $("settingsOverlay").classList.add("show");
+    $("planBody").textContent = planLabel();
     var addr = P.getAddress();
-    body.innerHTML = "";
-    var row = document.createElement("div");
-    row.className = "wrow";
-    row.innerHTML = "<div class=\"wlab\">Phantom</div><div class=\"waddr\"></div>";
-    row.querySelector(".waddr").textContent = addr || "not connected";
-    body.appendChild(row);
-    var bal = document.createElement("div");
-    bal.className = "wbal";
-    bal.textContent = "loading balances…";
-    body.appendChild(bal);
-    P.holdingsForWallet().then(function (h) {
-      if (!h) { bal.textContent = "Connect Phantom in the shell first."; return; }
-      bal.textContent = "USDC " + uiAmount(h.usdc, 6) + " · TOKEN " + uiAmount(h.token, 6) + " · LEOS " + uiAmount(h.leos, 9);
-    }).catch(function () {
-      bal.textContent = "Could not read balances.";
-    });
+    $("walletBody").textContent = addr ? ("Phantom " + shortAddr(addr)) : "not connected";
   }
 
   function postBind(corpus, contextId) {
@@ -309,10 +300,6 @@
     var text = $("inp").value.trim();
     var t = ensureThread();
     if ((!text && !(t.items && t.items.length)) || busy) return;
-    if (!P.getAddress()) {
-      bubble("Connect Phantom in the shell first — each call is paid from your wallet.", false);
-      return;
-    }
     busy = true;
     $("inp").value = "";
     refreshSend();
@@ -391,6 +378,10 @@
       persist();
       setStatus("");
     }).catch(function (e) {
+      if (e && e.name === "SubscriptionRequiredError") {
+        thinking.textContent = e.message;
+        return;
+      }
       if (e && e.name === "FundsError") {
         showFunds(e.copy);
         thinking.textContent = e.copy && e.copy.body ? e.copy.body : "Need funds in Phantom.";
@@ -475,7 +466,10 @@
     bindThread(t);
   };
   $("pasteClose").onclick = function () { $("pasteOverlay").classList.remove("show"); };
-  $("walletBtn").onclick = openWallet;
+  $("settingsBtn").onclick = openSettings;
+  $("settingsClose").onclick = function () { $("settingsOverlay").classList.remove("show"); };
+  $("changePlanBtn").onclick = function () { P.signOutBilling(); };
+  $("connectWalletBtn").onclick = function () { P.requestWalletConnect(); };
   $("walletClose").onclick = function () { $("walletOverlay").classList.remove("show"); };
   $("leaveBtn").onclick = function () { P.disconnectWallet(); };
   $("fundsClose").onclick = function () { $("fundsOverlay").classList.remove("show"); };
@@ -494,8 +488,11 @@
 
   window.addEventListener("openzoo-wallet", function (e) {
     var addr = e.detail && e.detail.address;
-    $("walletBtn").textContent = addr ? shortAddr(addr) : "wallet";
-    if (!addr) $("walletOverlay").classList.remove("show");
+    if ($("walletBody")) $("walletBody").textContent = addr ? ("Phantom " + shortAddr(addr)) : "not connected";
+    if (!addr && $("walletOverlay")) $("walletOverlay").classList.remove("show");
+  });
+  window.addEventListener("openzoo-billing", function () {
+    if ($("planBody")) $("planBody").textContent = planLabel();
   });
 
   if (!threads.length) newThread();
@@ -504,7 +501,6 @@
     renderThreads();
     renderChat();
   }
-  $("walletBtn").textContent = P.getAddress() ? shortAddr(P.getAddress()) : "wallet";
   P.requestWalletInfo();
   loadModels();
   P.loadDirectory().catch(function () {});
