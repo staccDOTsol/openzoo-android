@@ -105,18 +105,20 @@ function tier(id) {
   console.log("ok Play Billing plugin");
 })();
 
-(function grokuiDoesNotLeadWithWallet() {
+(function grokuiIsPlayOnly() {
   const html = load("www/app/index.html");
   assert.ok(html.includes("Settings"));
-  assert.ok(html.includes("Phantom") && html.includes("optional"));
+  assert.ok(html.includes("Change plan"));
+  assert.ok(!/Phantom|Connect Phantom|not connected|Crypto wrap|#walletOverlay|#fundsOverlay|#wrapOverlay/.test(html));
   const js = load("www/app/js/app.js");
-  assert.ok(js.includes("requestWalletConnect"));
   assert.ok(js.includes("signOutBilling"));
-  assert.ok(!js.includes("Connect Phantom to send"));
+  assert.ok(!js.includes("requestWalletConnect"));
+  assert.ok(!js.includes("Connect Phantom"));
   const pay = load("www/app/js/pay.js");
   assert.ok(pay.includes("SubscriptionRequiredError"));
-  assert.ok(pay.includes("walletPayEnabled"));
-  console.log("ok grokui Play-first, wallet secondary");
+  assert.ok(!pay.includes("walletPayEnabled"));
+  assert.ok(!pay.includes("wallet-connect"));
+  console.log("ok grokui Play-only, no wallet chrome");
 })();
 
 (function entitlementFromPurchaseToken() {

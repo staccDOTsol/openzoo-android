@@ -2,12 +2,11 @@
   "name": "fun.openzoo.android",
   "displayName": "OpenZoo",
   "version": "1.0.0",
-  "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone. Play Billing subscriptions first; Phantom/x402 is optional.",
+  "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone. Play Billing subscriptions only.",
   "main": "index.js",
   "scripts": {
-    "test": "node test/rails.test.js && node test/wrap.test.js && node test/bind.test.js && node test/billing.test.js && node test/clipboard.test.js && node test/dev-unlock.test.js && node test/smoke-gateway.js",
+    "test": "node test/rails.test.js && node test/bind.test.js && node test/billing.test.js && node test/clipboard.test.js && node test/dev-unlock.test.js && node test/smoke-gateway.js",
     "test:rails": "node test/rails.test.js",
-    "test:wrap": "node test/wrap.test.js",
     "test:bind": "node test/bind.test.js",
     "test:billing": "node test/billing.test.js",
     "test:clipboard": "node test/clipboard.test.js",
@@ -21,11 +20,8 @@
   },
   "keywords": [
     "ecosystem:cordova",
-    "solana",
-    "phantom",
-    "mobile-wallet-adapter",
-    "x402",
-    "openzoo"
+    "openzoo",
+    "play-billing"
   ],
   "author": "staccDOTsol",
   "repository": {
@@ -36,7 +32,6 @@
   "license": "MIT",
   "devDependencies": {
     "cordova-android": "^14.0.1",
-    "cordova-plugin-mwa": "file:cordova-plugin-mwa",
     "cordova-plugin-play-billing": "file:cordova-plugin-play-billing",
     "cordova-plugin-openzoo-clipboard": "file:cordova-plugin-openzoo-clipboard"
   },
@@ -45,7 +40,6 @@
       "android"
     ],
     "plugins": {
-      "cordova-plugin-mwa": {},
       "cordova-plugin-play-billing": {},
       "cordova-plugin-openzoo-clipboard": {}
     }

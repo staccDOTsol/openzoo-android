@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
-<meta name="openzoo-connect" content="https://zoo.openzoo.fun https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com">
+  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
+<meta name="openzoo-connect" content="https://zoo.openzoo.fun https://x402-tokens.fly.dev">
 <title>openzoo</title>
 <style>
   :root { color-scheme: dark; }
@@ -99,22 +99,15 @@
   #send svg { width: 16px; height: 16px; }
   #menuBtn { display: none; }
   #scrim { display: none; }
-  #walletOverlay, #pasteOverlay, #fundsOverlay, #settingsOverlay, #wrapOverlay {
+  #pasteOverlay, #settingsOverlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.66); z-index: 80;
     display: none; align-items: flex-end; justify-content: center;
   }
-  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show, #settingsOverlay.show, #wrapOverlay.show { display: flex; }
+  #pasteOverlay.show, #settingsOverlay.show { display: flex; }
   .sheet { width: 100%; max-width: 560px; max-height: 82vh; overflow-y: auto; background: #111113;
            border: 1px solid #2c2c2e; border-radius: 16px 16px 0 0; padding: 20px 18px 24px; }
   .sheet h3 { margin: 0 0 6px; font-size: 15px; }
   .wsub, .tiny { color: #8e8e93; font-size: 12px; margin: 0 0 14px; }
-  .wrow { border: 1px solid #1c1c1e; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
-  .wlab { color: #6f7080; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-  .waddr {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
-    word-break: break-all; -webkit-user-select: text; user-select: text;
-    cursor: pointer; color: #ececec;
-  }
   .wbal { border: 1px solid #1c1c1e; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
   .ghost { background: none; border: 1px solid #2c2c2e; border-radius: 12px; padding: 8px 12px; color: #ececec; }
   .sheet textarea { width: 100%; min-height: 120px; background: #1c1c1e; color: #ececec; border: 1px solid #2c2c2e;
@@ -122,13 +115,6 @@
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .sendish { background: #fff; color: #000; border: 0; border-radius: 12px; padding: 8px 14px; font-weight: 700; }
   #statusLine { font-size: 11px; color: #8e8e93; padding: 0 16px 4px; min-height: 16px; }
-  #toast {
-    position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
-    transform: translateX(-50%) translateY(12px); background: #ececec; color: #111;
-    border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;
-    opacity: 0; pointer-events: none; z-index: 120; transition: opacity .15s, transform .15s;
-  }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   @media (max-width: 720px) {
     #sidebar {
       position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-105%);
@@ -196,32 +182,11 @@
   <div id="settingsOverlay">
     <div class="sheet">
       <h3>Settings</h3>
-      <p class="wsub">Google Play subscription first. Phantom / x402 is optional and off by default.</p>
+      <p class="wsub">Google Play subscription. Basic $9 / Pro $29 / Ultra $99.</p>
       <div id="planBody" class="wbal">loading plan…</div>
       <div class="actions">
         <button class="ghost" id="changePlanBtn" type="button">Change plan</button>
-      </div>
-      <h3 style="margin-top:18px">Phantom (optional)</h3>
-      <p class="tiny">Crypto wrap stays here for later. It is not how you start the app. Tap or select an address to copy.</p>
-      <div class="wrow">
-        <div class="wlab">Phantom</div>
-        <div id="walletAddr" class="waddr" data-copy-kind="phantom">not connected</div>
-      </div>
-      <div class="actions">
-        <button class="ghost" id="connectWalletBtn" type="button">Connect Phantom</button>
-        <button class="ghost" id="leaveBtn" type="button">disconnect</button>
         <button class="ghost" id="settingsClose" type="button">close</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="walletOverlay">
-    <div class="sheet">
-      <h3>Phantom</h3>
-      <p class="wsub">Optional. Public address only. Tap or select to copy.</p>
-      <div id="walletDetail" class="waddr" data-copy-kind="phantom">not connected</div>
-      <div class="actions">
-        <button class="ghost" id="walletClose" type="button">close</button>
       </div>
     </div>
   </div>
@@ -238,37 +203,7 @@
     </div>
   </div>
 
-  <div id="fundsOverlay">
-    <div class="sheet">
-      <h3 id="fundsTitle">Need funds in Phantom</h3>
-      <p class="tiny" id="fundsBody"></p>
-      <p class="tiny" id="fundsWhich"></p>
-      <div class="wrow">
-        <div class="wlab">Your address</div>
-        <div id="fundsAddr" class="waddr" data-copy-kind="phantom">not connected</div>
-      </div>
-      <div class="actions">
-        <button class="ghost" id="fundsClose" type="button">close</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="wrapOverlay">
-    <div class="sheet">
-      <h3 id="wrapTitle">Wrap TOKEN to send this?</h3>
-      <p class="tiny" id="wrapBody">Phantom will wrap a little TOKEN so this message can send.</p>
-      <div class="actions">
-        <button class="sendish" id="wrapOk" type="button">Wrap TOKEN</button>
-        <button class="ghost" id="wrapCancel" type="button">cancel</button>
-      </div>
-    </div>
-  </div>
-
-<div id="toast" role="status" aria-live="polite"></div>
-<script src="../js/clipboard.js"></script>
-<script src="js/solana-lite.js"></script>
 <script src="js/rails.js"></script>
-<script src="js/wrap.js"></script>
 <script src="js/bind.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>

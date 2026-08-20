@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com https: wss: ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
   <title>OpenZoo</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -86,8 +86,6 @@
   var B = window.OpenZooBilling;
   var GAME_URL = 'app/index.html';
   var GAME_ORIGIN = '*';
-  var connectedAddress = null;
-  var connectedMethod = null;
   var billingState = B.readStore();
   var busy = false;
 
@@ -127,13 +125,6 @@
         pending: !billingState.key,
         purchase: billingState.purchase || null,
       }, GAME_ORIGIN);
-      if (connectedAddress) {
-        iframe.contentWindow.postMessage({
-          type: 'wallet-connected',
-          address: connectedAddress,
-          method: connectedMethod,
-        }, GAME_ORIGIN);
-      }
     }
     iframe.addEventListener('load', function onLoad() {
       iframe.removeEventListener('load', onLoad);
@@ -314,28 +305,6 @@
   });
   $restore.onclick = restore;
 
-  function connectMWA() {
-    if (!window.MWA) {
-      setStatus('Wallet is a Settings option — subscribe with Play first');
-      return;
-    }
-    window.MWA.authorize(
-      function (result) {
-        connectedAddress = result.address;
-        connectedMethod = 'MWA';
-        var iframe = document.getElementById('game');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({
-            type: 'wallet-connected',
-            address: connectedAddress,
-            method: connectedMethod,
-          }, GAME_ORIGIN);
-        }
-      },
-      function (err) { setStatus(String(err).replace(/^MWA[: ]+/i, '')); }
-    );
-  }
-
   window.addEventListener('message', function (event) {
     var gameFrame = document.getElementById('game');
     if (!gameFrame || event.source !== gameFrame.contentWindow) return;
@@ -368,70 +337,6 @@
       persistBilling({});
       showPaywall();
       return;
-    }
-
-    if (data.type === 'wallet-connect-request') {
-      connectMWA();
-      return;
-    }
-
-    if (data.type === 'wallet-disconnect') {
-      connectedAddress = null;
-      connectedMethod = null;
-      gameFrame.contentWindow.postMessage({ type: 'wallet-disconnected' }, GAME_ORIGIN);
-    }
-
-    if (data.type === 'wallet-request-info' && connectedAddress) {
-      gameFrame.contentWindow.postMessage({
-        type: 'wallet-connected',
-        address: connectedAddress,
-        method: connectedMethod,
-      }, GAME_ORIGIN);
-    }
-
-    if (data.type === 'wallet-sign-message') {
-      var respondMsg = function (payload) {
-        payload.type = 'wallet-sign-response';
-        payload.id = data.id;
-        gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
-      };
-      if (connectedMethod === 'MWA' && window.MWA) {
-        var messageB64 = btoa(String.fromCharCode.apply(null, new TextEncoder().encode(data.message)));
-        window.MWA.signMessage(messageB64,
-          function (result) { respondMsg({ signature: result.signature }); },
-          function (err) { respondMsg({ error: err }); }
-        );
-      } else respondMsg({ error: 'No wallet connected' });
-    }
-
-    if (data.type === 'wallet-sign-transaction') {
-      var respondTx = function (payload) {
-        payload.type = 'wallet-sign-transaction-response';
-        payload.id = data.id;
-        gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
-      };
-      if (connectedMethod === 'MWA' && window.MWA) {
-        // Payment signer. MUST be signTransaction — facilitator stays the fee-payer.
-        window.MWA.signTransaction(data.transaction,
-          function (result) { respondTx({ signedTransaction: result.signedTransaction }); },
-          function (err) { respondTx({ error: err }); }
-        );
-      } else respondTx({ error: 'No wallet connected' });
-    }
-
-    if (data.type === 'wallet-sign-and-send-transaction') {
-      var respondSend = function (payload) {
-        payload.type = 'wallet-sign-and-send-transaction-response';
-        payload.id = data.id;
-        gameFrame.contentWindow.postMessage(payload, GAME_ORIGIN);
-      };
-      if (connectedMethod === 'MWA' && window.MWA) {
-        // Wrap / top-up only — wallet may broadcast. Not the first-run path.
-        window.MWA.signAndSendTransaction(data.transaction,
-          function (result) { respondSend({ signature: result.signature }); },
-          function (err) { respondSend({ error: err }); }
-        );
-      } else respondSend({ error: 'No wallet connected' });
     }
   });
 
@@ -516,7 +421,7 @@
   document.addEventListener('pause', function () { notifyApp('app-pause'); }, false);
   document.addEventListener('resume', function () { notifyApp('app-resume'); }, false);
 
-  // Browser / unit environments still render the Play paywall, never Stripe or Phantom first.
+  // Browser / unit environments still render the Play paywall, never Stripe or a wallet.
   if (!window.cordova) boot();
   </script>
 </body>

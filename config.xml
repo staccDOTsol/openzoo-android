@@ -1,29 +1,20 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="fun.openzoo.android" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>OpenZoo</name>
-    <description>OpenZoo for Android 14+ — grokui on a phone. Google Play Billing subscriptions first (Basic/Pro/Ultra). Threads, chat, attach. Phantom/x402 is optional in Settings. Not the Seeker dApp store listing and not PSG1.</description>
+    <description>OpenZoo for Android 14+ — grokui on a phone. Google Play Billing subscriptions only (Basic/Pro/Ultra). Threads, chat, attach. Not the Seeker dApp store listing and not PSG1.</description>
     <author href="https://github.com/staccDOTsol/openzoo-android">
         staccDOTsol
     </author>
 
-    <!-- Local shell owns MWA; iframe loads the bundled chat UI -->
+    <!-- Play paywall shell; iframe loads the bundled chat UI -->
     <content src="index.html" />
 
     <allow-navigation href="https://zoo.openzoo.fun/*" />
     <allow-navigation href="https://x402-tokens.fly.dev/*" />
-    <allow-navigation href="https://x402.accrue.fund/*" />
     <access origin="https://zoo.openzoo.fun" />
     <access origin="https://x402-tokens.fly.dev" />
-    <access origin="https://x402.accrue.fund" />
-    <access origin="https://api.mainnet-beta.solana.com" />
-    <access origin="https://solana-rpc.publicnode.com" />
 
-    <!-- Open wrap / help links in the system browser -->
     <allow-intent href="https://*/*" />
-    <!-- MWA uses solana-wallet:// to discover Phantom and other wallets -->
-    <allow-intent href="solana-wallet://*" />
-    <!-- Extra Phantom custom scheme only. Never the HTTPS /ul/ browse link. -->
-    <allow-intent href="phantom://v1/*" />
 
     <preference name="Fullscreen" value="true" />
     <preference name="StatusBarOverlaysWebView" value="false" />

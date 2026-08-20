@@ -13,11 +13,10 @@ function load(rel) {
 }
 
 (function toastLabels() {
-  assert.strictEqual(C.toastLabel("phantom"), "copied");
   assert.strictEqual(C.toastLabel(), "copied");
-  assert.strictEqual(C.toastLabel("burner"), "copied local burner");
-  assert.strictEqual(C.toastLabel("local-burner"), "copied local burner");
-  assert.strictEqual(C.toastLabel("local burner"), "copied local burner");
+  assert.strictEqual(C.toastLabel("anything"), "copied");
+  const js = load("www/js/clipboard.js");
+  assert.doesNotMatch(js, /copied local burner|phantom|burner/);
   console.log("ok clipboard toast labels");
 })();
 
@@ -29,46 +28,20 @@ function load(rel) {
   assert.match(plugin, /ClipboardManager/);
   assert.match(plugin, /setPrimaryClip/);
   const html = load("www/app/index.html");
-  assert.match(html, /user-select:\s*text/);
-  assert.match(html, /id="toast"/);
-  assert.match(html, /data-copy-kind="phantom"/);
+  assert.doesNotMatch(html, /data-copy-kind/);
   const app = load("www/app/js/app.js");
-  assert.match(app, /copyAddress/);
-  assert.match(app, /clipboard-copy/);
-  console.log("ok native clipboard + selectable address");
+  assert.doesNotMatch(app, /copyAddress|data-copy-kind/);
+  console.log("ok native clipboard stays; address copy chrome is gone");
 })();
 
 (function networkGarbageHidden() {
   assert.ok(R.looksNetworkGarbage("Load failed"));
   assert.ok(R.looksNetworkGarbage(new Error("Failed to fetch")));
   assert.ok(R.looksNetworkGarbage("net::ERR_INTERNET_DISCONNECTED"));
-  assert.ok(!R.looksNetworkGarbage("Need funds in Phantom"));
-  assert.match(R.friendlyNetworkMessage(), /retries when you come back/);
-  assert.doesNotMatch(R.friendlyNetworkMessage(), /Load failed|net::|Failed to fetch/);
+  assert.ok(!R.looksNetworkGarbage("Subscribe with Google Play"));
+  assert.match(R.friendlyNetworkMessage(), /Try again/);
+  assert.doesNotMatch(R.friendlyNetworkMessage(), /Load failed|net::|Failed to fetch|Phantom|wallet/);
   console.log("ok network garbage sanitized");
-})();
-
-(function pending402Persists() {
-  const store = {
-    data: {},
-    setItem: function (k, v) { this.data[k] = v; },
-    getItem: function (k) { return this.data[k] || null; },
-    removeItem: function (k) { delete this.data[k]; },
-  };
-  R.savePending402({ path: "/v1/chat/completions", method: "POST", body: "{}" }, store);
-  const job = R.loadPending402(store);
-  assert.strictEqual(job.path, "/v1/chat/completions");
-  R.clearPending402(store);
-  assert.strictEqual(R.loadPending402(store), null);
-  const pay = load("www/app/js/pay.js");
-  assert.match(pay, /savePending402/);
-  assert.match(pay, /PaymentPausedError/);
-  assert.match(pay, /app-resume/);
-  assert.match(pay, /confirmWrap/);
-  assert.match(load("www/app/index.html"), /Wrap TOKEN to send this\?/);
-  const shell = load("www/index.html");
-  assert.match(shell, /notifyApp\('app-resume'\)/);
-  console.log("ok 402 persists across resume");
 })();
 
 (function cspListsRealOrigins() {
@@ -78,25 +51,24 @@ function load(rel) {
     assert.ok(app.includes(origin), "app CSP missing " + origin);
     assert.ok(shell.includes(origin), "shell CSP missing " + origin);
   });
-  console.log("ok CSP connect-src includes gateway + RPCs");
+  assert.doesNotMatch(app + shell, /x402\.accrue\.fund|api\.mainnet-beta\.solana\.com|solana-rpc\.publicnode\.com/);
+  console.log("ok CSP connect-src is zoo + gateway only");
 })();
 
-(function noPhantomHttpsUl() {
+(function noPhantomOrMwa() {
   const files = [
     "www/index.html",
     "www/app/index.html",
     "www/app/js/app.js",
     "www/app/js/pay.js",
     "www/js/billing.js",
-    "cordova-plugin-mwa/src/android/MWAPlugin.java",
-    "cordova-plugin-mwa/www/mwa.js",
     "config.xml",
   ];
   const joined = files.map(load).join("\n");
   assert.doesNotMatch(joined, /https:\/\/phantom\.app\/ul\//);
   assert.doesNotMatch(joined, /phantom:\/\/ul\//);
-  const cfg = load("config.xml");
-  assert.match(cfg, /phantom:\/\/v1\//);
-  assert.match(load("cordova-plugin-mwa/src/android/MWAPlugin.java"), /MWA only/);
-  console.log("ok no Phantom HTTPS /ul/ path; custom scheme is phantom://v1/");
+  assert.doesNotMatch(joined, /phantom:\/\/v1\//);
+  assert.doesNotMatch(joined, /solana-wallet:\/\//);
+  assert.doesNotMatch(joined, /MWA\.(authorize|signTransaction|signAndSendTransaction)/);
+  console.log("ok no Phantom / MWA pay path");
 })();
