@@ -2,6 +2,8 @@
   "use strict";
 
   var R = root.OpenZooRails;
+  var W = root.OpenZooWrap;
+  var S = root.OpenZooSolana;
   var walletAddress = null;
   var signWaiters = {};
 
@@ -25,41 +27,40 @@
     }
   }
 
-  function openWrapPage() {
-    if (root.parent && root.parent !== root) {
-      root.parent.postMessage({ type: "open-external-url", url: R.WRAP_URL }, "*");
-    } else if (typeof root.open === "function") {
-      root.open(R.WRAP_URL, "_blank");
-    }
-  }
-
-  /**
-   * Ask the Cordova shell to MWA.signTransaction (partial sign only).
-   * Never signAndSend — the gateway feePayer must complete settlement.
-   */
-  function signTransaction(txB64) {
+  function parentCall(type, extra) {
     return new Promise(function (resolve, reject) {
       if (!root.parent || root.parent === root) {
         reject(new Error("Wallet shell is not available"));
         return;
       }
-      var id = "tx-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      var id = type + "-" + Date.now() + "-" + Math.random().toString(36).slice(2);
       var timer = setTimeout(function () {
         if (signWaiters[id]) {
           delete signWaiters[id];
-          reject(new Error("Wallet sign timed out"));
+          reject(new Error("Wallet timed out"));
         }
       }, 120000);
       signWaiters[id] = {
         resolve: function (v) { clearTimeout(timer); resolve(v); },
         reject: function (e) { clearTimeout(timer); reject(e); },
       };
-      root.parent.postMessage({
-        type: "wallet-sign-transaction",
-        id: id,
-        transaction: txB64,
-      }, "*");
+      root.parent.postMessage(Object.assign({ type: type, id: id }, extra || {}), "*");
     });
+  }
+
+  /**
+   * 402 pay path: partial-sign only. Facilitator stays the fee-payer.
+   * Never signAndSend a payment transaction.
+   */
+  function signTransaction(txB64) {
+    return parentCall("wallet-sign-transaction", { transaction: txB64 });
+  }
+
+  /**
+   * Wrap / top-up path: wallet may broadcast. The user is the fee-payer.
+   */
+  function signAndSendTransaction(txB64) {
+    return parentCall("wallet-sign-and-send-transaction", { transaction: txB64 });
   }
 
   root.addEventListener("message", function (event) {
@@ -75,12 +76,13 @@
       setAddress(null);
       root.dispatchEvent(new CustomEvent("openzoo-wallet", { detail: { address: null } }));
     }
-    if (data.type === "wallet-sign-transaction-response") {
+    if (data.type === "wallet-sign-transaction-response" ||
+        data.type === "wallet-sign-and-send-transaction-response") {
       var waiter = signWaiters[data.id];
       if (!waiter) return;
       delete signWaiters[data.id];
       if (data.error) waiter.reject(new Error(data.error));
-      else waiter.resolve(data.signedTransaction);
+      else waiter.resolve(data.signedTransaction || data.signature);
     }
   });
 
@@ -118,6 +120,14 @@
   ContextNotFoundError.prototype = Object.create(Error.prototype);
   ContextNotFoundError.prototype.constructor = ContextNotFoundError;
 
+  function FundsError(copy) {
+    this.name = "FundsError";
+    this.message = copy && copy.body ? copy.body : "Need funds in Phantom";
+    this.copy = copy;
+  }
+  FundsError.prototype = Object.create(Error.prototype);
+  FundsError.prototype.constructor = FundsError;
+
   function mintRawBalance(owner, mint) {
     return rpc("getTokenAccountsByOwner", [
       owner,
@@ -136,39 +146,54 @@
     });
   }
 
-  function probeBalances(owner, accepts) {
-    var payable = {};
-    var underlying = {};
-    var specs = [];
+  function loadDirectory() {
+    var cached = R.getCachedDirectory();
+    if (cached && cached.length) return Promise.resolve(cached);
+    return fetch(R.SUPPORTED_URL, { headers: { accept: "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (body) {
+        var kinds = R.parseSupported(body);
+        R.setDirectory(kinds);
+        return kinds;
+      });
+  }
+
+  function uniqueMints(list) {
     var seen = {};
-    R.PAYABLE.forEach(function (p) {
-      var live = accepts ? R.findPayableRow(accepts, p.symbol) : null;
-      var mint = (live && live.asset) || p.mint;
-      if (mint === R.PLAIN_USDC || seen[p.symbol]) return;
-      seen[p.symbol] = true;
-      specs.push({ symbol: p.symbol, mint: mint });
+    var out = [];
+    (list || []).forEach(function (m) {
+      if (!m || seen[m] || R.isDrainedMint(m)) return;
+      seen[m] = true;
+      out.push(m);
     });
-    var payableJobs = specs.map(function (p) {
-      return mintRawBalance(owner, p.mint).then(function (v) {
-        payable[p.symbol] = v;
-      });
-    });
-    return Promise.all(payableJobs).then(function () {
-      var underJobs = R.UNDERLYING.map(function (u) {
-        return mintRawBalance(owner, u.mint).then(function (v) {
-          underlying[u.symbol] = v;
-        });
-      });
-      return Promise.all(underJobs).then(function () {
-        return { probeFailed: false, payable: payable, underlying: underlying };
+    return out;
+  }
+
+  function probeBalances(owner, accepts, kinds) {
+    var twins = {};
+    var underlyings = {};
+    var twinMints = uniqueMints(R.solanaAccepts(accepts).map(function (a) { return a.asset; }));
+    var underMints = uniqueMints(R.wrapKinds(kinds).map(function (k) {
+      return k.extra.acquire.underlying.address;
+    }).concat([R.PLAIN_USDC, R.PLAIN_TOKEN, R.PLAIN_LEOS]));
+
+    function fill(map, mints) {
+      return Promise.all(mints.map(function (mint) {
+        return mintRawBalance(owner, mint).then(function (v) { map[mint] = v; });
+      }));
+    }
+
+    return fill(twins, twinMints).then(function () {
+      return fill(underlyings, underMints).then(function () {
+        return { probeFailed: false, twins: twins, underlyings: underlyings };
       }).catch(function () {
-        return { probeFailed: false, payable: payable, underlying: underlying };
+        return { probeFailed: false, twins: twins, underlyings: underlyings };
       });
     }).catch(function (e) {
       return {
         probeFailed: true,
-        payable: payable,
-        underlying: underlying,
+        twins: twins,
+        underlyings: underlyings,
         error: String((e && e.message) || e),
       };
     });
@@ -176,11 +201,8 @@
 
   function readBody(res) {
     return res.text().then(function (t) {
-      try {
-        return { raw: t, json: JSON.parse(t) };
-      } catch (e) {
-        return { raw: t, json: null };
-      }
+      try { return { raw: t, json: JSON.parse(t) }; }
+      catch (e) { return { raw: t, json: null }; }
     });
   }
 
@@ -197,13 +219,102 @@
     try { return JSON.stringify(value); } catch (e) { return String(value); }
   }
 
-  function SteerError(copy) {
-    this.name = "SteerError";
-    this.message = copy && copy.body ? copy.body : "Need a payable token";
-    this.copy = copy;
+  function mintOwner(mint) {
+    return rpc("getAccountInfo", [mint, { encoding: "base64" }]).then(function (info) {
+      if (info && info.value && info.value.owner) return info.value.owner;
+      return S.TOKEN_2022_PROGRAM;
+    }).catch(function () { return S.TOKEN_2022_PROGRAM; });
   }
-  SteerError.prototype = Object.create(Error.prototype);
-  SteerError.prototype.constructor = SteerError;
+
+  function tokenAmount(account) {
+    return rpc("getTokenAccountBalance", [account]).then(function (r) {
+      return BigInt((r && r.value && r.value.amount) || "0");
+    }).catch(function () { return 0n; });
+  }
+
+  function tokenSupply(mint) {
+    return rpc("getTokenSupply", [mint]).then(function (r) {
+      return BigInt((r && r.value && r.value.amount) || "0");
+    });
+  }
+
+  function latestBlockhash() {
+    return rpc("getLatestBlockhash", [{ commitment: "confirmed" }]).then(function (r) {
+      return r && r.value && r.value.blockhash;
+    });
+  }
+
+  function confirmSignature(signature, timeoutMs) {
+    timeoutMs = timeoutMs || 90000;
+    var deadline = Date.now() + timeoutMs;
+    function once() {
+      return rpc("getSignatureStatuses", [[signature]]).then(function (res) {
+        var st = res && res.value && res.value[0];
+        if (st) {
+          if (st.err) throw new Error("top-up failed on-chain");
+          if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") {
+            return signature;
+          }
+        }
+        if (Date.now() >= deadline) throw new Error("top-up timed out");
+        return new Promise(function (resolve) { setTimeout(resolve, 1500); }).then(once);
+      }).catch(function (e) {
+        if (/failed on-chain|timed out/.test(e && e.message)) throw e;
+        if (Date.now() >= deadline) throw new Error("top-up timed out");
+        return new Promise(function (resolve) { setTimeout(resolve, 1500); }).then(once);
+      });
+    }
+    return once();
+  }
+
+  function topUpQuotedAsset(accept, kinds, owner, need, onStage) {
+    var poolHint = W.resolvePool(accept.asset, kinds);
+    if (!poolHint) throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
+    return mintOwner(accept.asset).then(function (wrappedProgram) {
+      var pool = W.resolvePool(accept.asset, kinds, wrappedProgram);
+      function attempt(n) {
+        return mintRawBalance(owner, accept.asset).then(function (have) {
+          var short = BigInt(need) - BigInt(have || "0");
+          if (short <= 0n) return { wrapped: true };
+          return Promise.all([
+            tokenAmount(pool.escrow),
+            tokenSupply(pool.wrapped),
+            mintRawBalance(owner, pool.underlying),
+          ]).then(function (pair) {
+            var deposit = W.depositForShares(short, pair[0], pair[1]);
+            if (BigInt(pair[2] || "0") < deposit) {
+              throw new FundsError(R.fundsCopy({
+                heldUnderlying: R.heldPlainNames((function () {
+                  var u = {};
+                  u[pool.underlying] = pair[2];
+                  return u;
+                })()),
+                empty: BigInt(pair[2] || "0") === 0n,
+              }));
+            }
+            if (onStage) onStage("topup");
+            return latestBlockhash().then(function (blockhash) {
+              if (!blockhash) throw new Error("could not fetch a recent blockhash");
+              var tx = W.buildWrapTx(pool, owner, deposit, blockhash, owner);
+              return signAndSendTransaction(tx.base64).then(function (sig) {
+                if (!sig) throw new Error("Wallet did not top up");
+                return confirmSignature(sig);
+              }).catch(function (e) {
+                if (R.looksNoSol(e && e.message) || /lamports|blockhash|fee/i.test(e && e.message || "")) {
+                  throw new FundsError(R.wrapSolCopy());
+                }
+                throw e;
+              });
+            }).then(function () {
+              if (n >= 2) return { wrapped: true };
+              return attempt(n + 1);
+            });
+          });
+        });
+      }
+      return attempt(0);
+    });
+  }
 
   function buildPayment(accept, payer) {
     return fetch(R.GATEWAY + "/v1/pay/build", {
@@ -232,43 +343,51 @@
     });
   }
 
-  function paymentHeaderFor(challengeJson, payer) {
+  function paymentHeaderFor(challengeJson, payer, onStage) {
     var accepts = extractAccepts(challengeJson);
-    var help = challengeJson && challengeJson.help;
-    return probeBalances(payer, accepts).then(function (balances) {
-      var decision = R.pickRail(accepts, balances);
-      if (decision.mode === "steer") {
-        throw new SteerError(R.steerCopy(decision, help));
-      }
-      if (decision.mode === "pay") {
-        return tryPayRow(decision.accept, payer).catch(function (e) {
-          if (R.looksUnderfunded(e && e.message)) {
-            throw new SteerError(R.steerCopy({
-              mode: "steer",
-              heldUnderlying: R.heldSymbols(balances.underlying),
-              empty: R.heldSymbols(balances.underlying).length === 0,
-            }, help));
-          }
-          throw e;
-        });
-      }
-      var order = decision.order || [];
-      var i = 0;
-      function next() {
-        if (i >= order.length) {
-          throw new SteerError(R.steerCopy({
-            mode: "steer",
-            heldUnderlying: [],
-            empty: true,
-          }, help));
+    return loadDirectory().then(function (kinds) {
+      return probeBalances(payer, accepts, kinds).then(function (balances) {
+        var decision = R.pickRail(accepts, balances, kinds);
+
+        function afterReady(accept) {
+          return tryPayRow(accept, payer).catch(function (e) {
+            if (R.looksUnderfunded(e && e.message)) {
+              throw new FundsError(R.fundsCopy({
+                heldUnderlying: R.heldPlainNames(balances.underlyings),
+                empty: R.heldPlainNames(balances.underlyings).length === 0,
+              }));
+            }
+            throw e;
+          });
         }
-        var row = order[i++];
-        return tryPayRow(row.accept, payer).catch(function (e) {
-          if (R.looksUnderfunded(e && e.message)) return next();
-          throw e;
-        });
-      }
-      return next();
+
+        if (decision.mode === "need-funds") {
+          throw new FundsError(R.fundsCopy(decision));
+        }
+        if (decision.mode === "pay") {
+          return afterReady(decision.accept);
+        }
+        if (decision.mode === "wrap") {
+          return topUpQuotedAsset(
+            decision.accept,
+            kinds,
+            payer,
+            decision.accept.maxAmountRequired,
+            onStage
+          ).then(function () { return afterReady(decision.accept); });
+        }
+        var order = decision.order || [];
+        var i = 0;
+        function next() {
+          if (i >= order.length) throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
+          var row = order[i++];
+          return tryPayRow(row.accept, payer).catch(function (e) {
+            if (R.looksUnderfunded(e && e.message)) return next();
+            throw e;
+          });
+        }
+        return next();
+      });
     });
   }
 
@@ -296,7 +415,7 @@
       }
       if (res.status !== 402) return res;
       return readBody(res).then(function (challenge) {
-        return paymentHeaderFor(challenge.json || {}, payer).then(function (header) {
+        return paymentHeaderFor(challenge.json || {}, payer, options.onStage).then(function (header) {
           var retryHeaders = Object.assign({}, headers, { "X-PAYMENT": header });
           return fetch(R.GATEWAY + path, {
             method: options.method || "GET",
@@ -307,11 +426,7 @@
             return readBody(retry).then(function (failed) {
               var msg = errText((failed.json && (failed.json.error || failed.json.message)) || failed.raw || ("HTTP " + retry.status));
               if (R.looksUnderfunded(msg)) {
-                throw new SteerError(R.steerCopy({
-                  mode: "steer",
-                  heldUnderlying: [],
-                  empty: true,
-                }, challenge.json && challenge.json.help));
+                throw new FundsError(R.fundsCopy({ heldUnderlying: [], empty: true }));
               }
               var err = new Error(msg);
               err.status = retry.status;
@@ -324,16 +439,33 @@
     });
   }
 
+  function holdingsForWallet() {
+    var owner = walletAddress;
+    if (!owner) return Promise.resolve(null);
+    return loadDirectory().then(function (kinds) {
+      return probeBalances(owner, [], kinds).then(function (b) {
+        return {
+          address: owner,
+          usdc: b.underlyings[R.PLAIN_USDC] || "0",
+          token: b.underlyings[R.PLAIN_TOKEN] || "0",
+          leos: b.underlyings[R.PLAIN_LEOS] || "0",
+        };
+      });
+    });
+  }
+
   root.OpenZooPay = {
     setAddress: setAddress,
     getAddress: getAddress,
     requestWalletInfo: requestWalletInfo,
     disconnectWallet: disconnectWallet,
     signTransaction: signTransaction,
-    openWrapPage: openWrapPage,
+    signAndSendTransaction: signAndSendTransaction,
     probeBalances: probeBalances,
+    loadDirectory: loadDirectory,
     paidFetch: paidFetch,
-    SteerError: SteerError,
+    holdingsForWallet: holdingsForWallet,
+    FundsError: FundsError,
     ContextNotFoundError: ContextNotFoundError,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1,138 +1,210 @@
 <!doctype html>
-<html lang="en" data-page="openzoo-android">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://x402-tokens.fly.dev https://x402.accrue.fund https://api.mainnet-beta.solana.com https://solana-rpc.publicnode.com; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
-<title>OpenZoo</title>
+<title>openzoo</title>
 <style>
-  :root {
-    --paper: #faf6ee; --card: #ffffff; --ink: #22271f; --muted: #7a806f;
-    --leaf: #3e7c4f; --leaf-soft: #e3efe0; --line: #e6e0d2; --accent-warm: #f3e8d2;
-    --danger: #8a3b2a;
-  }
+  :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
-  body { margin: 0; background: var(--paper); color: var(--ink);
-    font: 15px/1.5 ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", sans-serif;
-    display: flex; flex-direction: column; }
-  header { padding: 10px 14px 8px; border-bottom: 1px solid var(--line); background: var(--card);
-    padding-top: max(10px, env(safe-area-inset-top)); }
-  .brand { display: flex; align-items: center; gap: 8px; }
-  .brand h1 { font-size: 17px; margin: 0; letter-spacing: -.2px; }
-  .row-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-  select, button, textarea, input { font: inherit; color: inherit; }
-  input[type="text"], input[type="number"] {
-    border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; background: var(--paper);
+  html, body { margin: 0; height: 100%; background: #000; }
+  body { color: #ececec; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+         display: flex; height: 100%; overflow: hidden; }
+  #sidebar {
+    width: 280px; flex: 0 0 280px; border-right: 1px solid #1c1c1e; display: flex; flex-direction: column;
+    height: 100%; background: #000; z-index: 40;
+    padding-top: env(safe-area-inset-top);
   }
-  #model { flex: 1; min-width: 140px; }
-  .chip { font-size: 11px; color: var(--muted); background: var(--paper);
-    border: 1px solid var(--line); border-radius: 999px; padding: 4px 9px; white-space: nowrap; }
-  .chip.on { color: var(--leaf); border-color: var(--leaf); background: var(--leaf-soft); }
-  #chat { flex: 1; overflow-y: auto; padding: 16px 0 8px; }
-  .row { max-width: 780px; margin: 0 auto 12px; padding: 0 14px; display: flex; }
-  .bubble { padding: 10px 14px; border-radius: 16px; width: fit-content;
-    max-width: 100%; white-space: pre-wrap; overflow-wrap: break-word; }
-  [data-role="bubble-wrap"] { min-width: 0; max-width: min(92%, 640px);
-    display: flex; flex-direction: column; }
-  .row[data-row="user"] [data-role="bubble-wrap"] { margin-left: auto; align-items: flex-end; }
-  .me { background: var(--ink); color: var(--paper); border-bottom-right-radius: 4px; }
-  .zoo { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-  .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
-  footer { border-top: 1px solid var(--line); background: var(--card);
-    padding: 10px 14px max(12px, env(safe-area-inset-bottom)); }
-  .composer { display: flex; gap: 8px; align-items: flex-end; }
-  textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 14px;
-    padding: 10px 12px; background: var(--paper); min-height: 44px; max-height: 140px; outline: none; }
-  textarea:focus { border-color: var(--leaf); }
-  .send { background: var(--leaf); color: #fff; border: 0; border-radius: 14px;
-    padding: 10px 16px; font-weight: 700; }
-  .send:disabled { opacity: .45; }
-  .ticker { margin-top: 6px; font-size: 12px; color: var(--muted);
-    display: flex; gap: 12px; flex-wrap: wrap; }
-  .panel { display: none; border-bottom: 1px solid var(--line); background: var(--accent-warm); padding: 12px 14px; }
-  .panel.open { display: block; }
-  .panel textarea { width: 100%; background: #fffdf7; min-height: 90px; }
-  .tiny { font-size: 12px; color: var(--muted); }
-  .ghost { background: none; border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; }
-  #steer {
-    display: none; position: fixed; inset: 0; background: rgba(34,39,31,.45);
-    z-index: 20; align-items: flex-end; justify-content: center;
+  #sideTop { display: flex; align-items: center; gap: 6px; padding: 10px 8px 0; }
+  #search { flex: 1; margin: 0; padding: 8px 12px; background: #1c1c1e; border-radius: 10px; color: #ececec;
+            border: none; font: inherit; }
+  #search::placeholder { color: #8e8e93; }
+  #threads { flex: 1; overflow-y: auto; padding: 8px 0 16px; }
+  .trow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; border-radius: 10px;
+          margin: 0 6px 2px; }
+  .trow:hover { background: #17171a; }
+  .trow.active { background: #1c1c1e; }
+  .tavatar { width: 36px; height: 36px; border-radius: 10px; flex: 0 0 36px; display: flex; align-items: center;
+             justify-content: center; color: #fff; font-weight: 600; font-size: 14px; }
+  .tmeta { min-width: 0; flex: 1; }
+  .tname { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tprev { font-size: 12px; color: #8e8e93; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tclose { flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%; border: none; background: transparent;
+            color: #8e8e93; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent;
+              color: #ececec; display: flex; align-items: center; justify-content: center; cursor: pointer;
+              flex: 0 0 32px; }
+  .icon-btn:hover { background: #3a3a3c; }
+  .icon-btn svg { width: 18px; height: 18px; }
+  #main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; }
+  #chatHeader { padding: 12px 14px; padding-top: max(12px, env(safe-area-inset-top));
+                border-bottom: 1px solid #1c1c1e; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  #chatHeaderId { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden; }
+  .hname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #headerDials { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .dial { border: 1px solid #2c2c2e; background: #131315; color: #8e8e93; font: inherit; font-size: 11px;
+          border-radius: 999px; padding: 4px 8px; cursor: pointer; max-width: 140px; }
+  .dial:hover { color: #ececec; border-color: #3a3a3c; }
+  #log { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 8px;
+         display: flex; flex-direction: column; gap: 6px; -webkit-user-select: text; user-select: text; }
+  .row { display: flex; max-width: 86%; min-width: 0; margin: 2px 0; }
+  .row.user { align-self: flex-end; }
+  .row.bot { align-self: flex-start; }
+  .bubble { padding: 11px 16px; border-radius: 20px; white-space: pre-wrap; word-break: break-word;
+            min-width: 0; max-width: 100%; }
+  .row.user .bubble { background: #57575c; }
+  .row.bot .bubble { background: #262626; color: #ececec; }
+  .meta { font-size: 11px; color: #8e8e93; margin-top: 4px; }
+  .dots span { display: inline-block; width: 5px; height: 5px; margin-right: 3px; border-radius: 50%;
+               background: #8e8e93; animation: blink 1.2s infinite ease-in-out; }
+  .dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  #bar { padding: 10px 12px max(14px, env(safe-area-inset-bottom)); position: relative; }
+  #plusMenu { position: absolute; bottom: 62px; left: 12px; background: #1c1c1e; border-radius: 14px;
+              padding: 6px; display: none; flex-direction: column; min-width: 190px;
+              box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 10; }
+  #plusMenu.show { display: flex; }
+  .pop-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px;
+              cursor: pointer; color: #ececec; font-size: 14px; }
+  .pop-item:hover { background: #2c2c2e; }
+  #attachChips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px 6px; }
+  .achip { display: flex; align-items: center; gap: 6px; background: #2c2c2e; color: #ececec; border-radius: 10px;
+           padding: 4px 8px; font-size: 12px; }
+  .achip .ax { cursor: pointer; color: #8e8e93; }
+  #row-input { display: flex; align-items: center; gap: 8px; }
+  #pill { flex: 1; display: flex; align-items: center; gap: 6px; background: #2c2c2e; border-radius: 26px;
+          padding: 8px 10px 8px 8px; }
+  #inp { flex: 1; background: transparent; border: none; color: #ececec; font: inherit; padding: 6px 0; min-width: 0; }
+  #inp::placeholder { color: #8e8e93; }
+  #inp:focus { outline: none; }
+  #send { width: 34px; height: 34px; border-radius: 50%; border: none; background: #fff; color: #000;
+          display: none; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 34px; }
+  #send.show { display: flex; }
+  #send svg { width: 16px; height: 16px; }
+  #menuBtn { display: none; }
+  #scrim { display: none; }
+  #walletOverlay, #pasteOverlay, #fundsOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.66); z-index: 80;
+    display: none; align-items: flex-end; justify-content: center;
   }
-  #steer.open { display: flex; }
-  .steer-card {
-    background: var(--card); border-radius: 18px 18px 0 0; padding: 18px 16px 22px;
-    width: 100%; max-width: 520px; box-shadow: 0 -8px 30px rgba(0,0,0,.12);
+  #walletOverlay.show, #pasteOverlay.show, #fundsOverlay.show { display: flex; }
+  .sheet { width: 100%; max-width: 560px; max-height: 82vh; overflow-y: auto; background: #111113;
+           border: 1px solid #2c2c2e; border-radius: 16px 16px 0 0; padding: 20px 18px 24px; }
+  .sheet h3 { margin: 0 0 6px; font-size: 15px; }
+  .wsub, .tiny { color: #8e8e93; font-size: 12px; margin: 0 0 14px; }
+  .wrow { border: 1px solid #1c1c1e; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+  .wlab { color: #6f7080; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .waddr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
+  .wbal { border: 1px solid #1c1c1e; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; }
+  .ghost { background: none; border: 1px solid #2c2c2e; border-radius: 12px; padding: 8px 12px; color: #ececec; }
+  .sheet textarea { width: 100%; min-height: 120px; background: #1c1c1e; color: #ececec; border: 1px solid #2c2c2e;
+                    border-radius: 12px; padding: 10px; font: inherit; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .sendish { background: #fff; color: #000; border: 0; border-radius: 12px; padding: 8px 14px; font-weight: 700; }
+  #statusLine { font-size: 11px; color: #8e8e93; padding: 0 16px 4px; min-height: 16px; }
+  @media (max-width: 720px) {
+    #sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-105%);
+      transition: transform .18s ease; box-shadow: 8px 0 30px rgba(0,0,0,.4);
+    }
+    #sidebar.open { transform: none; }
+    #menuBtn { display: flex; }
+    #scrim.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 30; }
   }
-  .steer-card h2 { margin: 0 0 10px; font-size: 18px; }
-  .steer-card p { white-space: pre-wrap; margin: 0 0 14px; }
-  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>
 </head>
-<body data-component="app">
-<header>
-  <div class="brand">
-    <span aria-hidden="true">🦓</span>
-    <h1>OpenZoo</h1>
-    <span style="flex:1"></span>
-    <span class="chip" id="walletChip">no wallet</span>
-    <button class="ghost" id="disconnectBtn" type="button">leave</button>
+<body>
+  <div id="scrim"></div>
+  <div id="sidebar">
+    <div id="sideTop">
+      <input id="search" placeholder="Search" autocomplete="off">
+      <button class="icon-btn" id="newBtn" title="New thread" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+    <div id="threads"></div>
   </div>
-  <div class="row-bar">
-    <input id="model" list="modelList" placeholder="pick a model" autocomplete="off">
-    <datalist id="modelList"></datalist>
-    <button class="ghost" id="brainBtn" type="button">bind</button>
-    <button class="ghost" id="statsBtn" type="button">stats</button>
-    <button class="ghost" id="newBtn" type="button">new</button>
-    <span class="chip" id="ctxChip" style="display:none"></span>
-    <span class="chip" id="netChip">connecting…</span>
-  </div>
-</header>
 
-<div id="drawer" class="panel">
-  <p class="tiny" style="margin:0 0 8px">Paste a corpus. Bind is free. Later chats send only retrieved slices via <code>x-hrr-context</code> — the whole document is not re-sent.</p>
-  <textarea id="corpus" placeholder="paste text…"></textarea>
-  <div style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-    <button class="send" id="bindBtn" type="button">bind</button>
-    <label class="tiny">top-k <input id="topK" type="number" min="1" max="32" style="width:64px" placeholder="auto"></label>
-    <span class="tiny" id="bindStatus"></span>
-  </div>
-</div>
-
-<div id="stats" class="panel">
-  <p class="tiny" style="margin:0 0 8px">Public gateway stats (no wallet needed).</p>
-  <pre id="statsBody" class="tiny" style="white-space:pre-wrap; margin:0"></pre>
-</div>
-
-<div id="chat">
-  <div class="row" data-row="welcome"><div class="bubble zoo">OpenZoo on Android — chat, bind a corpus, and view public stats. Each completion is paid with USDC on Solana from your Phantom wallet. This phone app cannot run, write, read, or serve local files.</div></div>
-</div>
-
-<footer>
-  <div class="composer">
-    <textarea id="box" placeholder="say something…" rows="1"></textarea>
-    <button class="send" id="sendBtn" type="button">send</button>
-  </div>
-  <div class="ticker">
-    <span id="spent">this session: $0.0000</span>
-    <span id="saved"></span>
-    <span id="calls"></span>
-  </div>
-</footer>
-
-<div id="steer">
-  <div class="steer-card">
-    <h2 id="steerTitle">Need USDC on Solana</h2>
-    <p id="steerBody" class="tiny"></p>
-    <div class="actions">
-      <button class="send" id="steerWrap" type="button">Open wrap page</button>
-      <button class="ghost" id="steerClose" type="button">close</button>
+  <div id="main">
+    <div id="chatHeader">
+      <button class="icon-btn" id="menuBtn" type="button" aria-label="Threads">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div id="chatHeaderId">
+        <div class="tavatar" id="headAv">OZ</div>
+        <div class="hname" id="headName">openzoo</div>
+      </div>
+      <div id="headerDials">
+        <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
+        <datalist id="modelList"></datalist>
+        <button class="dial" id="walletBtn" type="button">wallet</button>
+      </div>
+    </div>
+    <div id="log"></div>
+    <div id="statusLine"></div>
+    <div id="bar">
+      <div id="plusMenu">
+        <div class="pop-item" id="attachBtn">Attach files</div>
+        <div class="pop-item" id="folderBtn">Attach folder</div>
+        <div class="pop-item" id="pasteBtn">Paste text</div>
+      </div>
+      <input id="fileInp" type="file" multiple style="position:absolute;width:1px;height:1px;opacity:0">
+      <input id="folderInp" type="file" webkitdirectory multiple style="position:absolute;width:1px;height:1px;opacity:0">
+      <div id="attachChips"></div>
+      <div id="row-input">
+        <div id="pill">
+          <button class="icon-btn" id="plusBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <input id="inp" placeholder="Message" autocomplete="off">
+        </div>
+        <button id="send" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
+  <div id="walletOverlay">
+    <div class="sheet">
+      <h3>Your wallet</h3>
+      <p class="wsub">This is your Phantom wallet on this phone. The app pays each call from it. Public address only — the UI never shows a key.</p>
+      <div id="walletBody">loading…</div>
+      <div class="actions">
+        <button class="ghost" id="leaveBtn" type="button">leave</button>
+        <button class="ghost" id="walletClose" type="button">close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pasteOverlay">
+    <div class="sheet">
+      <h3>Paste text</h3>
+      <p class="tiny">Attached notes are remembered for this thread. You will not see any bind homework.</p>
+      <textarea id="pasteBox" placeholder="paste anything…"></textarea>
+      <div class="actions">
+        <button class="sendish" id="pasteSave" type="button">attach</button>
+        <button class="ghost" id="pasteClose" type="button">close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="fundsOverlay">
+    <div class="sheet">
+      <h3 id="fundsTitle">Need funds in Phantom</h3>
+      <p class="tiny" id="fundsBody"></p>
+      <div class="actions">
+        <button class="ghost" id="fundsClose" type="button">close</button>
+      </div>
+    </div>
+  </div>
+
+<script src="js/solana-lite.js"></script>
 <script src="js/rails.js"></script>
+<script src="js/wrap.js"></script>
+<script src="js/bind.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>
 </body>

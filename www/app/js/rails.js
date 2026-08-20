@@ -1,3 +1,8 @@
+/**
+ * Live 402 rails from GET https://x402.accrue.fund/supported.
+ * Symbols and acquire steps come from that directory. The drained
+ * wTOKENx mint is hidden. FXYkw… is always wTOKENx2, never wTOKENx.
+ */
 (function (root, factory) {
   var api = factory();
   if (typeof module === "object" && module.exports) {
@@ -9,160 +14,219 @@
   "use strict";
 
   var GATEWAY = "https://x402-tokens.fly.dev";
-  var WRAP_URL = "https://x402.accrue.fund/start";
+  var SUPPORTED_URL = "https://x402.accrue.fund/supported";
   var DEFAULT_MODEL = "google/gemini-3.7-flash";
+  var NAMESPACE = "stacc";
 
-  // Chat only. Do not claim RUN / WRITE / READ / SERVE — those need a desktop shell.
+  var PLAIN_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  var PLAIN_TOKEN = "EVULoNF4DeMBN4dGiZiDfpiiTfNZgoCvXWWgaV3epump";
+  var PLAIN_LEOS = "5xgsnby6P9zqGK71J7H4yJLxzqPvNbC7rDZxNzjHmj7e";
+  var WTOKENX2_MINT = "FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B";
+  var DRAINED_WTOKENX = "Bo7xBF7SY8EyUBPUxRP66SFafxoPf2n5uqiLjbxEebx9";
+  var WRAP_PROGRAM = "FrSERTNCPvTtaDS9AvQp9u1nYGzXDb3kC9MdL8Xxn2NE";
+
   var SYSTEM_PROMPT =
-    "You are OpenZoo on Android. This app is chat only: conversation, an optional bound corpus, and public stats. " +
+    "You are OpenZoo on a phone — the same product as the grokui desktop client, " +
+    "minus a local shell. This app is chat, threads, and an attached corpus. " +
     "You cannot run shell commands, write files, read the device filesystem, or serve a local server. " +
     "Never emit RUN, WRITE, READ, or SERVE directives. If asked for those, say this phone app cannot do that.";
-
-  var NAMESPACE = "stacc";
-  var PLAIN_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
-  // Known-good live mints (2026-08-20). Prefer the live 402 accepts[] row's
-  // asset over these so a stale catalog mint cannot win.
-  var PAYABLE = [
-    { symbol: "yUSDCx", mint: "6ZjjxcoicqM4nniddkuPVwew4PDwY3swbfHsGbCuLuTv", decimals: 6 },
-    { symbol: "wTOKENx", mint: "FXYkwMtfKpA174rp8ixVeiGs5TYGaBsYRrHE3KrR449B", decimals: 6 },
-    { symbol: "wLEOSx", mint: "3FViQRMqtG6dUDFxZyyVvpM9xTHsKdX7uqZ5jvL8NZ35", decimals: 9 },
-  ];
-
-  // Underlying assets a user might hold. Plain USDC is NEVER an accepts[] row;
-  // /v1/pay/build does not wrap.
-  var UNDERLYING = [
-    { symbol: "USDC", mint: PLAIN_USDC, twin: "yUSDCx" },
-    { symbol: "TOKEN", mint: "EVULoNF4DeMBN4dGiZiDfpiiTfNZgoCvXWWgaV3epump", twin: "wTOKENx" },
-    { symbol: "LEOS", mint: "5xgsnby6P9zqGK71J7H4yJLxzqPvNbC7rDZxNzjHmj7e", twin: "wLEOSx" },
-  ];
 
   var RPC_URLS = [
     "https://api.mainnet-beta.solana.com",
     "https://solana-rpc.publicnode.com",
   ];
 
-  function isPlainUsdcRow(row) {
-    return !!(row && row.asset === PLAIN_USDC);
-  }
-
-  function isSolanaRow(row) {
-    return !!(row && String(row.network || "").indexOf("solana:") === 0);
-  }
-
-  function solanaAccepts(accepts) {
-    return (accepts || []).filter(function (row) {
-      return isSolanaRow(row) && !isPlainUsdcRow(row);
-    });
-  }
-
-  function rowSymbol(row) {
-    if (!row) return "";
-    if (row.extra && row.extra.symbol) return String(row.extra.symbol);
-    return "";
-  }
-
-  function findPayableRow(accepts, symbol) {
-    var spec = null;
-    for (var i = 0; i < PAYABLE.length; i++) {
-      if (PAYABLE[i].symbol === symbol) spec = PAYABLE[i];
-    }
-    var rows = accepts || [];
-    var bySymbol = null;
-    var byMint = null;
-    for (var j = 0; j < rows.length; j++) {
-      var row = rows[j];
-      if (!isSolanaRow(row) || isPlainUsdcRow(row)) continue;
-      if (rowSymbol(row) === symbol) bySymbol = row;
-      if (spec && row.asset === spec.mint) byMint = row;
-    }
-    // Live extra.symbol wins so a stale catalog mint (e.g. old wTOKENx) is ignored.
-    return bySymbol || byMint;
-  }
+  var directoryCache = { at: 0, kinds: null };
 
   function asBigInt(v) {
-    try {
-      return BigInt(String(v == null ? "0" : v));
-    } catch (e) {
-      return BigInt(0);
-    }
+    try { return BigInt(String(v == null ? "0" : v)); }
+    catch (e) { return BigInt(0); }
   }
 
   function canCover(rawBalance, maxAmountRequired) {
     return asBigInt(rawBalance) >= asBigInt(maxAmountRequired);
   }
 
+  function isSolanaNetwork(network) {
+    return String(network || "").indexOf("solana:") === 0;
+  }
+
+  function isDrainedMint(mint) {
+    return String(mint || "") === DRAINED_WTOKENX;
+  }
+
+  function isPlainUsdc(mint) {
+    return String(mint || "") === PLAIN_USDC;
+  }
+
+  function canonicalSymbol(mint, directorySymbol, challengeSymbol) {
+    if (isDrainedMint(mint)) return null;
+    if (mint === WTOKENX2_MINT) return "wTOKENx2";
+    if (directorySymbol && directorySymbol !== "wTOKENx") return directorySymbol;
+    if (challengeSymbol && challengeSymbol !== "wTOKENx") return challengeSymbol;
+    return directorySymbol || challengeSymbol || "";
+  }
+
+  function kindAsset(kind) {
+    return kind && kind.extra && kind.extra.asset;
+  }
+
+  function kindSymbol(kind) {
+    return kind && kind.extra && kind.extra.symbol;
+  }
+
+  function solanaKinds(kinds) {
+    return (kinds || []).filter(function (k) {
+      return isSolanaNetwork(k && k.network) && kindAsset(k) && !isDrainedMint(kindAsset(k));
+    });
+  }
+
+  function wrapKinds(kinds) {
+    return solanaKinds(kinds).filter(function (k) {
+      var acq = k.extra && k.extra.acquire;
+      return acq && acq.method === "spl-token-wrap" && acq.underlying && acq.underlying.address && acq.escrow;
+    });
+  }
+
+  function findKindByMint(kinds, mint) {
+    var list = solanaKinds(kinds);
+    for (var i = 0; i < list.length; i++) {
+      if (kindAsset(list[i]) === mint) return list[i];
+    }
+    return null;
+  }
+
+  function rowSymbol(row) {
+    return row && row.extra && row.extra.symbol ? String(row.extra.symbol) : "";
+  }
+
+  function isSolanaRow(row) {
+    return !!(row && isSolanaNetwork(row.network) && !isPlainUsdc(row.asset) && !isDrainedMint(row.asset));
+  }
+
+  function solanaAccepts(accepts) {
+    return (accepts || []).filter(isSolanaRow);
+  }
+
+  function annotateAccepts(accepts, kinds) {
+    return solanaAccepts(accepts).map(function (row) {
+      var kind = findKindByMint(kinds, row.asset);
+      var symbol = canonicalSymbol(row.asset, kindSymbol(kind), rowSymbol(row));
+      return {
+        accept: row,
+        symbol: symbol,
+        kind: kind,
+        acquire: kind && kind.extra && kind.extra.acquire,
+        billedUsd: Number(row.extra && row.extra.billedUsd),
+      };
+    }).filter(function (a) { return !!a.symbol; });
+  }
+
   /**
-   * Pick a Solana rail the wallet can actually pay.
-   * balances = { payable: { yUSDCx: "raw" }, underlying: { USDC: "raw" }, probeFailed?: bool }
+   * Pick how to pay from live /supported + the 402 accepts[] + wallet balances.
+   * balances = {
+   *   twins: { [mint]: raw },
+   *   underlyings: { [mint]: raw },
+   *   probeFailed?: bool
+   * }
    */
-  function pickRail(accepts, balances) {
-    var sol = solanaAccepts(accepts);
+  function pickRail(accepts, balances, kinds) {
+    var annotated = annotateAccepts(accepts, kinds);
     balances = balances || {};
-    var payable = balances.payable || {};
-    var underlying = balances.underlying || {};
+    var twins = balances.twins || {};
+    var underlyings = balances.underlyings || {};
 
     if (balances.probeFailed) {
-      var order = [];
-      for (var i = 0; i < PAYABLE.length; i++) {
-        var row = findPayableRow(sol, PAYABLE[i].symbol);
-        if (row) order.push({ symbol: PAYABLE[i].symbol, accept: row });
-      }
-      return { mode: "fallback", order: order };
+      return {
+        mode: "fallback",
+        order: annotated.slice().sort(function (a, b) {
+          var au = Number.isFinite(a.billedUsd) ? a.billedUsd : 1e9;
+          var bu = Number.isFinite(b.billedUsd) ? b.billedUsd : 1e9;
+          return au - bu;
+        }),
+      };
     }
 
-    for (var j = 0; j < PAYABLE.length; j++) {
-      var spec = PAYABLE[j];
-      var accept = findPayableRow(sol, spec.symbol);
-      if (!accept) continue;
-      if (canCover(payable[spec.symbol], accept.maxAmountRequired)) {
-        return { mode: "pay", symbol: spec.symbol, accept: accept };
-      }
+    var payable = annotated.filter(function (a) {
+      return canCover(twins[a.accept.asset], a.accept.maxAmountRequired);
+    }).sort(function (a, b) {
+      var au = Number.isFinite(a.billedUsd) ? a.billedUsd : 1e9;
+      var bu = Number.isFinite(b.billedUsd) ? b.billedUsd : 1e9;
+      return au - bu;
+    });
+    if (payable.length) {
+      return { mode: "pay", symbol: payable[0].symbol, accept: payable[0].accept, annotated: payable[0] };
     }
 
-    var held = [];
-    for (var k = 0; k < UNDERLYING.length; k++) {
-      var u = UNDERLYING[k];
-      if (asBigInt(underlying[u.symbol]) > BigInt(0)) held.push(u.symbol);
+    var wrappable = [];
+    for (var i = 0; i < annotated.length; i++) {
+      var a = annotated[i];
+      var under = a.acquire && a.acquire.underlying && a.acquire.underlying.address;
+      if (!under) continue;
+      if (asBigInt(underlyings[under]) > 0n) {
+        wrappable.push({
+          symbol: a.symbol,
+          accept: a.accept,
+          annotated: a,
+          underlying: under,
+          underlyingSymbol: a.acquire.underlying.symbol || heldName(under),
+          underlyingRaw: String(underlyings[under] || "0"),
+        });
+      }
     }
+    wrappable.sort(function (a, b) {
+      return asBigInt(b.underlyingRaw) > asBigInt(a.underlyingRaw) ? 1 : -1;
+    });
+    if (wrappable.length) {
+      return {
+        mode: "wrap",
+        symbol: wrappable[0].symbol,
+        accept: wrappable[0].accept,
+        annotated: wrappable[0].annotated,
+        underlying: wrappable[0].underlying,
+        underlyingSymbol: wrappable[0].underlyingSymbol,
+        underlyingRaw: wrappable[0].underlyingRaw,
+      };
+    }
+
     return {
-      mode: "steer",
-      heldUnderlying: held,
-      empty: held.length === 0,
+      mode: "need-funds",
+      heldUnderlying: heldPlainNames(underlyings),
+      empty: heldPlainNames(underlyings).length === 0,
     };
   }
 
-  function heldSymbols(underlying) {
-    var held = [];
-    underlying = underlying || {};
-    for (var k = 0; k < UNDERLYING.length; k++) {
-      var sym = UNDERLYING[k].symbol;
-      if (asBigInt(underlying[sym]) > BigInt(0)) held.push(sym);
-    }
-    return held;
+  function heldName(mint) {
+    if (mint === PLAIN_USDC) return "USDC";
+    if (mint === PLAIN_TOKEN) return "TOKEN";
+    if (mint === PLAIN_LEOS) return "LEOS";
+    return "token";
   }
 
-  function steerCopy(decision, helpText) {
-    var wrap = WRAP_URL;
-    var body =
-      "This app pays with USDC on Solana. If your Phantom wallet only has regular USDC, open " +
-      wrap +
-      " to wrap it, then come back. The app cannot wrap for you.";
-    var extras = [];
+  function heldPlainNames(underlyings) {
+    var names = [];
+    underlyings = underlyings || {};
+    [PLAIN_USDC, PLAIN_TOKEN, PLAIN_LEOS].forEach(function (mint) {
+      if (asBigInt(underlyings[mint]) > 0n) names.push(heldName(mint));
+    });
+    return names;
+  }
+
+  function fundsCopy(decision) {
     var held = (decision && decision.heldUnderlying) || [];
-    if (held.indexOf("TOKEN") !== -1) {
-      extras.push("You also have TOKEN here — that needs the same wrap step before it can pay.");
-    }
-    if (held.indexOf("LEOS") !== -1) {
-      extras.push("You also have LEOS here — that needs the same wrap step before it can pay.");
-    }
-    if (decision && decision.empty && helpText) extras.push(String(helpText));
-    if (extras.length) body = body + "\n\n" + extras.join("\n\n");
+    var body = held.length
+      ? "Add a little more USDC or TOKEN in Phantom, then send again. The app tops up for you."
+      : "Add USDC or TOKEN to Phantom, then send again. The app tops up for you.";
     return {
-      title: "Need USDC on Solana",
+      title: "Need funds in Phantom",
       body: body,
-      wrapUrl: wrap,
-      help: decision && decision.empty ? String(helpText || "") : "",
+    };
+  }
+
+  function wrapSolCopy() {
+    return {
+      title: "Need a little SOL",
+      body: "Phantom needs a little SOL to top up, then try again.",
     };
   }
 
@@ -187,6 +251,11 @@
   function looksUnderfunded(text) {
     var s = String(text || "").toLowerCase();
     return /insufficient|underfund|not enough|0x1\b|custom program error: 1|simulation failed|failed_settle|insufficientfunds|insufficient funds|no token account|could not find account|account not found/.test(s);
+  }
+
+  function looksNoSol(text) {
+    var s = String(text || "").toLowerCase();
+    return /no sol|insufficient.*lamports|insufficient funds for (rent|fee)|need .*sol\b/.test(s);
   }
 
   function encodePaymentHeader(envelope, signedTxB64) {
@@ -223,24 +292,54 @@
     return /deepseek|grok|thinking|fable|sonnet-5|-r1|reason/i.test(model || "") ? 16384 : 4096;
   }
 
+  function setDirectory(kinds) {
+    if (Array.isArray(kinds)) directoryCache = { at: Date.now(), kinds: kinds };
+    return directoryCache.kinds;
+  }
+
+  function getCachedDirectory() {
+    return directoryCache.kinds;
+  }
+
+  function parseSupported(body) {
+    if (!body) return [];
+    if (Array.isArray(body.kinds)) return body.kinds;
+    if (Array.isArray(body)) return body;
+    return [];
+  }
+
   return {
     GATEWAY: GATEWAY,
-    WRAP_URL: WRAP_URL,
+    SUPPORTED_URL: SUPPORTED_URL,
     DEFAULT_MODEL: DEFAULT_MODEL,
     SYSTEM_PROMPT: SYSTEM_PROMPT,
     NAMESPACE: NAMESPACE,
     PLAIN_USDC: PLAIN_USDC,
-    PAYABLE: PAYABLE,
-    UNDERLYING: UNDERLYING,
+    PLAIN_TOKEN: PLAIN_TOKEN,
+    PLAIN_LEOS: PLAIN_LEOS,
+    WTOKENX2_MINT: WTOKENX2_MINT,
+    DRAINED_WTOKENX: DRAINED_WTOKENX,
+    WRAP_PROGRAM: WRAP_PROGRAM,
     RPC_URLS: RPC_URLS,
+    asBigInt: asBigInt,
+    canCover: canCover,
+    isSolanaNetwork: isSolanaNetwork,
+    isDrainedMint: isDrainedMint,
+    isPlainUsdc: isPlainUsdc,
     isSolanaRow: isSolanaRow,
     solanaAccepts: solanaAccepts,
-    findPayableRow: findPayableRow,
-    canCover: canCover,
+    canonicalSymbol: canonicalSymbol,
+    solanaKinds: solanaKinds,
+    wrapKinds: wrapKinds,
+    findKindByMint: findKindByMint,
+    annotateAccepts: annotateAccepts,
     pickRail: pickRail,
-    heldSymbols: heldSymbols,
-    steerCopy: steerCopy,
+    heldName: heldName,
+    heldPlainNames: heldPlainNames,
+    fundsCopy: fundsCopy,
+    wrapSolCopy: wrapSolCopy,
     looksUnderfunded: looksUnderfunded,
+    looksNoSol: looksNoSol,
     encodePaymentHeader: encodePaymentHeader,
     decodePaymentHeader: decodePaymentHeader,
     defaultModelId: defaultModelId,
@@ -248,6 +347,10 @@
     bindPayload: bindPayload,
     isContextNotFound: isContextNotFound,
     gatewayHeaders: gatewayHeaders,
-    isPlainUsdcRow: isPlainUsdcRow,
+    setDirectory: setDirectory,
+    getCachedDirectory: getCachedDirectory,
+    parseSupported: parseSupported,
+    kindAsset: kindAsset,
+    kindSymbol: kindSymbol,
   };
 });

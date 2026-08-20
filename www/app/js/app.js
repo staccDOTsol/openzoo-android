@@ -3,26 +3,215 @@
 
   var R = window.OpenZooRails;
   var P = window.OpenZooPay;
+  var B = window.OpenZooBind;
   var $ = function (id) { return document.getElementById(id); };
-  var SKEY = "openzoo.android.session.v1";
+  var STORE = "openzoo.android.grokui.v1";
+  var PALETTE = ["#e91e8c", "#34c759", "#ff9500", "#5e5ce6", "#ff3b30", "#0a84ff", "#00c7be"];
 
-  var state = Object.assign(
-    { messages: [], ctx: null, corpus: "", spent: 0, saved: 0, calls: 0, model: "", topK: "" },
-    JSON.parse(localStorage.getItem(SKEY) || "{}"),
-    { busy: false }
-  );
+  function loadStore() {
+    try { return JSON.parse(localStorage.getItem(STORE) || "{}"); }
+    catch (e) { return {}; }
+  }
+
+  var saved = loadStore();
+  var threads = Array.isArray(saved.threads) ? saved.threads : [];
+  var activeId = saved.activeId || null;
+  var busy = false;
 
   function persist() {
-    localStorage.setItem(SKEY, JSON.stringify({
-      messages: state.messages,
-      ctx: state.ctx,
-      corpus: state.corpus,
-      spent: state.spent,
-      saved: state.saved,
-      calls: state.calls,
-      model: $("model") ? $("model").value : state.model,
-      topK: $("topK") ? $("topK").value : state.topK,
-    }));
+    localStorage.setItem(STORE, JSON.stringify({ threads: threads, activeId: activeId }));
+  }
+
+  function colorFor(name) {
+    var h = 0;
+    var s = String(name || "");
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  function initials(name) {
+    return String(name || "OZ").slice(0, 2).toUpperCase();
+  }
+
+  function uid() {
+    return "t-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  function active() {
+    for (var i = 0; i < threads.length; i++) if (threads[i].id === activeId) return threads[i];
+    return null;
+  }
+
+  function ensureThread() {
+    if (active()) return active();
+    return newThread();
+  }
+
+  function newThread() {
+    var t = {
+      id: uid(),
+      name: "New chat",
+      color: colorFor("chat" + threads.length),
+      messages: [],
+      items: [],
+      ctx: null,
+      corpus: "",
+      model: $("model") ? $("model").value : "",
+      spent: 0,
+      saved: 0,
+      calls: 0,
+      updatedAt: Date.now(),
+    };
+    threads.unshift(t);
+    activeId = t.id;
+    persist();
+    renderThreads();
+    renderChat();
+    return t;
+  }
+
+  function previewOf(t) {
+    for (var i = (t.messages || []).length - 1; i >= 0; i--) {
+      var m = t.messages[i];
+      if (m && m.content) return String(m.content).replace(/\s+/g, " ").slice(0, 72);
+    }
+    if (t.items && t.items.length) return B.chipLabel(t.items);
+    return "Say something";
+  }
+
+  function renderThreads() {
+    var q = ($("search").value || "").trim().toLowerCase();
+    var el = $("threads");
+    el.innerHTML = "";
+    var list = threads.filter(function (t) {
+      if (!q) return true;
+      return (t.name || "").toLowerCase().indexOf(q) !== -1 || previewOf(t).toLowerCase().indexOf(q) !== -1;
+    });
+    if (!list.length) {
+      var empty = document.createElement("div");
+      empty.className = "tprev";
+      empty.style.padding = "16px";
+      empty.textContent = threads.length ? "No matches" : "New thread with +";
+      el.appendChild(empty);
+      return;
+    }
+    list.forEach(function (t) {
+      var row = document.createElement("div");
+      row.className = "trow" + (t.id === activeId ? " active" : "");
+      var av = document.createElement("div");
+      av.className = "tavatar";
+      av.style.background = t.color || colorFor(t.name);
+      av.textContent = initials(t.name);
+      var meta = document.createElement("div");
+      meta.className = "tmeta";
+      var name = document.createElement("div");
+      name.className = "tname";
+      name.textContent = t.name || "New chat";
+      var prev = document.createElement("div");
+      prev.className = "tprev";
+      prev.textContent = previewOf(t);
+      meta.appendChild(name);
+      meta.appendChild(prev);
+      var x = document.createElement("button");
+      x.className = "tclose";
+      x.type = "button";
+      x.textContent = "×";
+      x.onclick = function (e) {
+        e.stopPropagation();
+        threads = threads.filter(function (o) { return o.id !== t.id; });
+        if (activeId === t.id) activeId = threads[0] ? threads[0].id : null;
+        persist();
+        if (!threads.length) newThread();
+        else { renderThreads(); renderChat(); }
+      };
+      row.appendChild(av);
+      row.appendChild(meta);
+      row.appendChild(x);
+      row.onclick = function () {
+        activeId = t.id;
+        persist();
+        $("sidebar").classList.remove("open");
+        $("scrim").classList.remove("show");
+        renderThreads();
+        renderChat();
+      };
+      el.appendChild(row);
+    });
+  }
+
+  function bubble(text, mine, meta) {
+    var row = document.createElement("div");
+    row.className = "row " + (mine ? "user" : "bot");
+    var wrap = document.createElement("div");
+    var b = document.createElement("div");
+    b.className = "bubble";
+    b.textContent = text;
+    wrap.appendChild(b);
+    if (meta) {
+      var m = document.createElement("div");
+      m.className = "meta";
+      m.textContent = meta;
+      wrap.appendChild(m);
+    }
+    row.appendChild(wrap);
+    $("log").appendChild(row);
+    $("log").scrollTop = $("log").scrollHeight;
+    return b;
+  }
+
+  function renderChat() {
+    var t = active();
+    $("log").innerHTML = "";
+    $("headName").textContent = t ? (t.name || "openzoo") : "openzoo";
+    $("headAv").textContent = initials(t ? t.name : "OZ");
+    $("headAv").style.background = t ? (t.color || colorFor(t.name)) : "#5e5ce6";
+    if (t && t.model) $("model").value = t.model;
+    if (!t || !t.messages.length) {
+      bubble("welcome — pick a model, attach notes if you want, and say anything. this phone app cannot run, write, read, or serve local files.", false);
+    } else {
+      t.messages.forEach(function (m) {
+        bubble(m.content, m.role === "user", m.meta || "");
+      });
+    }
+    renderAttachChips();
+    refreshSend();
+  }
+
+  function renderAttachChips() {
+    var t = active();
+    var el = $("attachChips");
+    el.innerHTML = "";
+    ((t && t.items) || []).forEach(function (it, i) {
+      var chip = document.createElement("span");
+      chip.className = "achip";
+      chip.innerHTML = "<span></span><span class=\"ax\">✕</span>";
+      chip.querySelector("span").textContent = it.name || "note";
+      chip.querySelector(".ax").onclick = function () {
+        t.items.splice(i, 1);
+        t.ctx = null;
+        t.corpus = B.corpusFromItems(t.items);
+        persist();
+        renderAttachChips();
+      };
+      el.appendChild(chip);
+    });
+    $("statusLine").textContent = t ? B.userVisibleStatus(t.items, !!t.ctx || !t.items.length) : "";
+  }
+
+  function refreshSend() {
+    var t = active();
+    var has = !!($("inp").value.trim() || (t && t.items && t.items.length));
+    $("send").classList.toggle("show", has);
+  }
+
+  function setStatus(msg) {
+    $("statusLine").textContent = msg || "";
+  }
+
+  function showFunds(copy) {
+    $("fundsTitle").textContent = (copy && copy.title) || "Need funds in Phantom";
+    $("fundsBody").textContent = (copy && copy.body) || "";
+    $("fundsOverlay").classList.add("show");
   }
 
   function shortAddr(addr) {
@@ -30,218 +219,32 @@
     return addr.slice(0, 4) + "…" + addr.slice(-4);
   }
 
-  function setWalletChip(addr) {
-    var chip = $("walletChip");
-    if (!chip) return;
-    chip.textContent = addr ? shortAddr(addr) : "no wallet";
-    chip.classList.toggle("on", !!addr);
+  function uiAmount(raw, decimals) {
+    var n = Number(raw || 0) / Math.pow(10, decimals);
+    if (!n) return "0";
+    return n >= 1 ? n.toFixed(2) : n.toPrecision(3);
   }
 
-  function showSteer(copy) {
-    $("steerTitle").textContent = (copy && copy.title) || "Need USDC on Solana";
-    $("steerBody").textContent = (copy && copy.body) || "";
-    $("steer").classList.add("open");
-  }
-
-  function hideSteer() {
-    $("steer").classList.remove("open");
-  }
-
-  function showPanel(name) {
-    $("stats").classList.toggle("open", name === "stats");
-    $("drawer").classList.toggle("open", name === "bind");
-  }
-
-  function bubble(text, mine, meta) {
+  function openWallet() {
+    $("walletOverlay").classList.add("show");
+    var body = $("walletBody");
+    var addr = P.getAddress();
+    body.innerHTML = "";
     var row = document.createElement("div");
-    row.className = "row";
-    row.setAttribute("data-row", mine ? "user" : "assistant");
-    var wrap = document.createElement("div");
-    wrap.setAttribute("data-role", "bubble-wrap");
-    var b = document.createElement("div");
-    b.className = "bubble " + (mine ? "me" : "zoo");
-    b.setAttribute("data-role", "bubble");
-    b.textContent = text;
-    wrap.appendChild(b);
-    if (meta) {
-      var m = document.createElement("div");
-      m.className = "meta";
-      m.setAttribute("data-role", "bubble-meta");
-      m.textContent = meta;
-      wrap.appendChild(m);
-    }
-    row.appendChild(wrap);
-    $("chat").appendChild(row);
-    $("chat").scrollTop = $("chat").scrollHeight;
-    return b;
-  }
-
-  function animal(id) {
-    id = id || "";
-    if (id.indexOf("anthropic") === 0) return "🦒";
-    if (id.indexOf("openai") === 0) return "🦉";
-    if (id.indexOf("deepseek") === 0) return "🐋";
-    if (id.indexOf("x-ai") === 0) return "🦊";
-    if (id.indexOf("google") === 0) return "🐦";
-    if (id.indexOf("meta") === 0) return "🦙";
-    if (id.indexOf("mistral") === 0) return "🐈";
-    if (id.indexOf("qwen") === 0) return "🐼";
-    return "🐾";
-  }
-
-  function loadModels() {
-    return fetch(R.GATEWAY + "/v1/models", {
-      headers: R.gatewayHeaders(),
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      var models = (d.data || []).filter(function (m) {
-        return m.id && m.id.charAt(0) !== "~" && m.id.indexOf(":batch") === -1;
-      });
-      models.sort(function (a, b) { return a.id.localeCompare(b.id); });
-      var dl = $("modelList");
-      dl.innerHTML = "";
-      models.forEach(function (m) {
-        var o = document.createElement("option");
-        o.value = m.id;
-        var inM = m.pricing && m.pricing.prompt ? (1e6 * m.pricing.prompt).toFixed(2) : "?";
-        o.label = animal(m.id) + " $" + inM + "/M";
-        dl.appendChild(o);
-      });
-      if (!$("model").value) $("model").value = R.defaultModelId(models);
-      $("netChip").textContent = models.length + " models";
-      $("netChip").classList.add("on");
+    row.className = "wrow";
+    row.innerHTML = "<div class=\"wlab\">Phantom</div><div class=\"waddr\"></div>";
+    row.querySelector(".waddr").textContent = addr || "not connected";
+    body.appendChild(row);
+    var bal = document.createElement("div");
+    bal.className = "wbal";
+    bal.textContent = "loading balances…";
+    body.appendChild(bal);
+    P.holdingsForWallet().then(function (h) {
+      if (!h) { bal.textContent = "Connect Phantom in the shell first."; return; }
+      bal.textContent = "USDC " + uiAmount(h.usdc, 6) + " · TOKEN " + uiAmount(h.token, 6) + " · LEOS " + uiAmount(h.leos, 9);
     }).catch(function () {
-      $("netChip").textContent = "gateway unreachable";
-      if (!$("model").value) $("model").value = R.DEFAULT_MODEL;
+      bal.textContent = "Could not read balances.";
     });
-  }
-
-  function renderStats(d) {
-    var today = d.today || {};
-    var lines = [];
-    if (d.app) lines.push(String(d.app));
-    lines.push("Today (" + (today.day || "?") + "): " + (today.calls || 0) + " calls · " +
-      (today.paid || 0) + " paid · $" + Number(today.usdPaid || 0).toFixed(2));
-    if (Array.isArray(d.days) && d.days.length) {
-      lines.push(d.days.length + " daily row" + (d.days.length === 1 ? "" : "s") +
-        " since " + ((d.coverage && d.coverage.since) || d.days[0].day || "?"));
-    }
-    if (d.growth && d.growth.trailing7) {
-      lines.push("Trailing 7 days: " + d.growth.trailing7.calls + " calls · $" +
-        Number(d.growth.trailing7.usdPaid || 0).toFixed(2));
-    }
-    var tops = (d.topModels || []).slice(0, 8).map(function (m) {
-      return (m.model || "?") + " (" + m.calls + ")";
-    });
-    if (tops.length) lines.push("Top models: " + tops.join(", "));
-    if (d.coverage && d.coverage.caveat) lines.push(d.coverage.caveat);
-    $("statsBody").textContent = lines.join("\n\n");
-  }
-
-  function loadStats() {
-    $("statsBody").textContent = "loading…";
-    return fetch(R.GATEWAY + "/v1/stats", { headers: R.gatewayHeaders() })
-      .then(function (r) { return r.json(); }).then(renderStats)
-      .catch(function (e) { $("statsBody").textContent = "Could not load stats: " + e.message; });
-  }
-
-  function handlePayError(e, thinking) {
-    if (e && e.name === "SteerError") {
-      showSteer(e.copy);
-      if (thinking) thinking.textContent = "Need USDC on Solana — see the wrap panel.";
-      return;
-    }
-    if (thinking) thinking.textContent = "the zoo hiccuped: " + ((e && e.message) || e);
-  }
-
-  function send() {
-    var text = $("box").value.trim();
-    if (!text || state.busy) return;
-    if (!P.getAddress()) {
-      bubble("Connect Phantom in the shell first — each call is paid from your wallet.", false);
-      return;
-    }
-    state.busy = true;
-    $("sendBtn").disabled = true;
-    $("box").value = "";
-    bubble(text, true);
-    state.messages.push({ role: "user", content: text });
-    var thinking = bubble("…", false);
-
-    var headers = {};
-    if (state.ctx) headers["x-hrr-context"] = state.ctx;
-    if ($("topK").value) headers["x-hrr-top-k"] = $("topK").value;
-
-    var model = $("model").value || R.DEFAULT_MODEL;
-    var payload = {
-      model: model,
-      messages: [{ role: "system", content: R.SYSTEM_PROMPT }].concat(state.messages),
-      max_tokens: R.maxTokensFor(model),
-    };
-
-    function runPaid() {
-      return P.paidFetch("/v1/chat/completions", {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-    }
-
-    runPaid().catch(function (e) {
-      if (e && e.name !== "ContextNotFoundError") throw e;
-      return rebindFree().then(function () {
-        if (state.ctx) headers["x-hrr-context"] = state.ctx;
-        else delete headers["x-hrr-context"];
-        return runPaid();
-      });
-    }).then(function (r) { return r.json(); }).then(function (d) {
-      var ch = d.choices && d.choices[0];
-      var content = (ch && ch.message && ch.message.content) || "";
-      if (!content && ch && ch.finish_reason === "length") {
-        content = "the model used its token budget on thinking and said nothing. try again.";
-      } else if (!content) {
-        content = (d.error && d.error.message) || "unusual reply: " + JSON.stringify(d).slice(0, 200);
-      }
-      thinking.textContent = content;
-      state.messages.push({ role: "assistant", content: content });
-      var x = d.x402 || {};
-      state.calls += 1;
-      if (typeof x.billedUsd === "number") state.spent += x.billedUsd;
-      if (typeof x.savesVsDirect === "number" && x.savesVsDirect > 0) state.saved += x.savesVsDirect;
-      var bits = [];
-      if (typeof x.billedUsd === "number") bits.push("$" + x.billedUsd.toFixed(4));
-      if (x.lecore && x.lecore.engaged) bits.push("retrieved " + (x.lecore.recalled != null ? x.lecore.recalled : "?") + " slices");
-      if (bits.length) {
-        var old = thinking.parentElement.querySelector("[data-role=bubble-meta]");
-        if (old) old.remove();
-        var meta = document.createElement("div");
-        meta.className = "meta";
-        meta.setAttribute("data-role", "bubble-meta");
-        meta.textContent = bits.join(" · ");
-        thinking.insertAdjacentElement("afterend", meta);
-      }
-      $("spent").textContent = "this session: $" + state.spent.toFixed(4);
-      if (state.saved > 0) $("saved").textContent = "saved ~$" + state.saved.toFixed(4) + " vs direct";
-      $("calls").textContent = state.calls + (state.calls === 1 ? " call" : " calls");
-      persist();
-    }).catch(function (e) {
-      handlePayError(e, thinking);
-    }).then(function () {
-      state.busy = false;
-      $("sendBtn").disabled = false;
-    });
-  }
-
-  function applyBind(d, corpus) {
-    if (!d || !d.context_id) return false;
-    state.ctx = d.context_id;
-    if (corpus) state.corpus = corpus;
-    $("bindStatus").textContent = "bound " + ((corpus || "").length / 1000).toFixed(0) + "k chars";
-    var chip = $("ctxChip");
-    chip.style.display = "";
-    chip.classList.add("on");
-    chip.textContent = "bound " + d.context_id.slice(0, 10) + "…";
-    persist();
-    return true;
   }
 
   function postBind(corpus, contextId) {
@@ -252,89 +255,257 @@
     }).then(function (r) { return r.json(); });
   }
 
-  function rebindFree() {
-    var corpus = state.corpus || ($("corpus") && $("corpus").value) || "";
+  function bindThread(t) {
+    var corpus = B.corpusFromItems(t.items);
+    t.corpus = corpus;
     if (!corpus.trim()) {
-      state.ctx = null;
+      t.ctx = null;
       persist();
       return Promise.resolve(null);
     }
-    return postBind(corpus, state.ctx).then(function (d) {
-      if (!applyBind(d, corpus)) {
-        state.ctx = null;
+    var parts = B.splitIntoParts(corpus);
+    var ctx = null;
+    var i = 0;
+    function next() {
+      if (i >= parts.length) {
+        t.ctx = ctx;
         persist();
+        return t.ctx;
       }
-      return d;
-    });
-  }
-
-  function bind() {
-    var corpus = $("corpus").value;
-    if (!corpus.trim()) return;
-    $("bindStatus").textContent = "binding…";
-    postBind(corpus, null).then(function (d) {
-      if (applyBind(d, corpus)) $("drawer").classList.remove("open");
-      else $("bindStatus").textContent = (d.error && d.error.message) || d.error || "bind failed";
-    }).catch(function (e) {
-      $("bindStatus").textContent = e.message;
-    });
-  }
-
-  function restore() {
-    state.messages.forEach(function (m) {
-      bubble(m.content, m.role === "user");
-    });
-    $("spent").textContent = "this session: $" + Number(state.spent || 0).toFixed(4);
-    if (state.saved > 0) $("saved").textContent = "saved ~$" + Number(state.saved).toFixed(4) + " vs direct";
-    if (state.calls) $("calls").textContent = state.calls + (state.calls === 1 ? " call" : " calls");
-    if (state.model) $("model").value = state.model;
-    if (state.topK) $("topK").value = state.topK;
-    if (state.corpus && $("corpus") && !$("corpus").value) $("corpus").value = state.corpus;
-    if (state.ctx) {
-      var chip = $("ctxChip");
-      chip.style.display = "";
-      chip.classList.add("on");
-      chip.textContent = "bound " + String(state.ctx).slice(0, 10) + "…";
+      var part = parts[i++];
+      return postBind(part, ctx).then(function (d) {
+        if (d && d.context_id) ctx = d.context_id;
+        return next();
+      });
     }
+    setStatus(t.items.length === 1 ? "attaching…" : "attaching " + t.items.length + " files…");
+    return next().then(function () {
+      setStatus(B.userVisibleStatus(t.items, true));
+      return t.ctx;
+    }).catch(function (e) {
+      setStatus("could not attach: " + ((e && e.message) || e));
+      return null;
+    });
   }
 
-  $("newBtn").onclick = function () {
-    localStorage.removeItem(SKEY);
-    location.reload();
+  function addItems(files) {
+    var t = ensureThread();
+    var jobs = [];
+    Array.prototype.forEach.call(files || [], function (f) {
+      if (!B.looksText(f.name, f.type)) return;
+      jobs.push(f.text().then(function (text) {
+        t.items.push({ name: B.fileLabel(f.webkitRelativePath || f.name), text: text });
+      }).catch(function () {}));
+    });
+    return Promise.all(jobs).then(function () {
+      persist();
+      renderAttachChips();
+      refreshSend();
+      return bindThread(t);
+    });
+  }
+
+  function send() {
+    var text = $("inp").value.trim();
+    var t = ensureThread();
+    if ((!text && !(t.items && t.items.length)) || busy) return;
+    if (!P.getAddress()) {
+      bubble("Connect Phantom in the shell first — each call is paid from your wallet.", false);
+      return;
+    }
+    busy = true;
+    $("inp").value = "";
+    refreshSend();
+    if (text) {
+      if (t.name === "New chat") t.name = text.slice(0, 32);
+      t.messages.push({ role: "user", content: text });
+      bubble(text, true);
+    } else {
+      var label = "look at what I attached";
+      t.messages.push({ role: "user", content: label });
+      bubble(label, true);
+    }
+    t.updatedAt = Date.now();
+    persist();
+    renderThreads();
+    var thinking = bubble("…", false);
+    thinking.innerHTML = "<span class=\"dots\"><span></span><span></span><span></span></span>";
+
+    function headersFor() {
+      var h = {};
+      if (t.ctx) h["x-hrr-context"] = t.ctx;
+      return h;
+    }
+
+    var model = $("model").value || t.model || R.DEFAULT_MODEL;
+    t.model = model;
+    var payload = {
+      model: model,
+      messages: [{ role: "system", content: R.SYSTEM_PROMPT }].concat(t.messages.map(function (m) {
+        return { role: m.role, content: m.content };
+      })),
+      max_tokens: R.maxTokensFor(model),
+    };
+
+    function runPaid() {
+      return P.paidFetch("/v1/chat/completions", {
+        method: "POST",
+        headers: headersFor(),
+        body: JSON.stringify(payload),
+        onStage: function (stage) {
+          if (stage === "topup") setStatus("topping up…");
+        },
+      });
+    }
+
+    var start = (t.items && t.items.length && !t.ctx) ? bindThread(t) : Promise.resolve(t.ctx);
+    start.then(function () {
+      return runPaid().catch(function (e) {
+        if (e && e.name !== "ContextNotFoundError") throw e;
+        return bindThread(t).then(function () { return runPaid(); });
+      });
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      var ch = d.choices && d.choices[0];
+      var content = (ch && ch.message && ch.message.content) || "";
+      if (!content && ch && ch.finish_reason === "length") {
+        content = "the model used its token budget on thinking and said nothing. try again.";
+      } else if (!content) {
+        content = (d.error && d.error.message) || "unusual reply";
+      }
+      thinking.textContent = content;
+      var x = d.x402 || {};
+      t.calls += 1;
+      if (typeof x.billedUsd === "number") t.spent += x.billedUsd;
+      if (typeof x.savesVsDirect === "number" && x.savesVsDirect > 0) t.saved += x.savesVsDirect;
+      var bits = [];
+      if (typeof x.billedUsd === "number") bits.push("$" + x.billedUsd.toFixed(4));
+      if (x.lecore && x.lecore.engaged) bits.push("retrieved " + (x.lecore.recalled != null ? x.lecore.recalled : "?") + " slices");
+      var meta = bits.join(" · ");
+      if (meta) {
+        var m = document.createElement("div");
+        m.className = "meta";
+        m.textContent = meta;
+        thinking.insertAdjacentElement("afterend", m);
+      }
+      t.messages.push({ role: "assistant", content: content, meta: meta });
+      persist();
+      setStatus("");
+    }).catch(function (e) {
+      if (e && e.name === "FundsError") {
+        showFunds(e.copy);
+        thinking.textContent = e.copy && e.copy.body ? e.copy.body : "Need funds in Phantom.";
+        return;
+      }
+      thinking.textContent = "the zoo hiccuped: " + ((e && e.message) || e);
+    }).then(function () {
+      busy = false;
+    });
+  }
+
+  function loadModels() {
+    return fetch(R.GATEWAY + "/v1/models", { headers: R.gatewayHeaders() })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var models = (d.data || []).filter(function (m) {
+          return m.id && m.id.charAt(0) !== "~" && m.id.indexOf(":batch") === -1;
+        });
+        models.sort(function (a, b) { return a.id.localeCompare(b.id); });
+        var dl = $("modelList");
+        dl.innerHTML = "";
+        models.forEach(function (m) {
+          var o = document.createElement("option");
+          o.value = m.id;
+          dl.appendChild(o);
+        });
+        if (!$("model").value) $("model").value = R.defaultModelId(models);
+      }).catch(function () {
+        if (!$("model").value) $("model").value = R.DEFAULT_MODEL;
+      });
+  }
+
+  $("newBtn").onclick = function () { newThread(); };
+  $("menuBtn").onclick = function () {
+    $("sidebar").classList.add("open");
+    $("scrim").classList.add("show");
   };
-  $("sendBtn").onclick = send;
-  $("box").addEventListener("keydown", function (e) {
+  $("scrim").onclick = function () {
+    $("sidebar").classList.remove("open");
+    $("scrim").classList.remove("show");
+  };
+  $("search").addEventListener("input", renderThreads);
+  $("plusBtn").onclick = function (e) {
+    e.stopPropagation();
+    $("plusMenu").classList.toggle("show");
+  };
+  document.addEventListener("click", function () { $("plusMenu").classList.remove("show"); });
+  $("attachBtn").onclick = function (e) {
+    e.stopPropagation();
+    $("plusMenu").classList.remove("show");
+    $("fileInp").click();
+  };
+  $("folderBtn").onclick = function (e) {
+    e.stopPropagation();
+    $("plusMenu").classList.remove("show");
+    $("folderInp").click();
+  };
+  $("pasteBtn").onclick = function (e) {
+    e.stopPropagation();
+    $("plusMenu").classList.remove("show");
+    $("pasteOverlay").classList.add("show");
+    $("pasteBox").focus();
+  };
+  $("fileInp").addEventListener("change", function () {
+    addItems($("fileInp").files);
+    $("fileInp").value = "";
+  });
+  $("folderInp").addEventListener("change", function () {
+    addItems($("folderInp").files);
+    $("folderInp").value = "";
+  });
+  $("pasteSave").onclick = function () {
+    var text = $("pasteBox").value;
+    if (!text.trim()) return;
+    var t = ensureThread();
+    t.items.push({ name: "note.txt", text: text });
+    $("pasteBox").value = "";
+    $("pasteOverlay").classList.remove("show");
+    persist();
+    renderAttachChips();
+    refreshSend();
+    bindThread(t);
+  };
+  $("pasteClose").onclick = function () { $("pasteOverlay").classList.remove("show"); };
+  $("walletBtn").onclick = openWallet;
+  $("walletClose").onclick = function () { $("walletOverlay").classList.remove("show"); };
+  $("leaveBtn").onclick = function () { P.disconnectWallet(); };
+  $("fundsClose").onclick = function () { $("fundsOverlay").classList.remove("show"); };
+  $("send").onclick = send;
+  $("inp").addEventListener("input", refreshSend);
+  $("inp").addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
     }
   });
-  $("brainBtn").onclick = function () {
-    var open = !$("drawer").classList.contains("open");
-    showPanel(open ? "bind" : "");
-  };
-  $("statsBtn").onclick = function () {
-    var open = !$("stats").classList.contains("open");
-    showPanel(open ? "stats" : "");
-    if (open) loadStats();
-  };
-  $("bindBtn").onclick = bind;
-  $("steerClose").onclick = hideSteer;
-  $("steerWrap").onclick = function () { P.openWrapPage(); };
-  $("disconnectBtn").onclick = function () { P.disconnectWallet(); };
-  $("corpus").addEventListener("drop", function (e) {
-    e.preventDefault();
-    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) f.text().then(function (t) { $("corpus").value = t; });
+  $("model").addEventListener("change", function () {
+    var t = active();
+    if (t) { t.model = $("model").value; persist(); }
   });
-  $("corpus").addEventListener("dragover", function (e) { e.preventDefault(); });
 
   window.addEventListener("openzoo-wallet", function (e) {
-    setWalletChip(e.detail && e.detail.address);
+    var addr = e.detail && e.detail.address;
+    $("walletBtn").textContent = addr ? shortAddr(addr) : "wallet";
+    if (!addr) $("walletOverlay").classList.remove("show");
   });
 
-  restore();
-  setWalletChip(P.getAddress());
+  if (!threads.length) newThread();
+  else {
+    if (!active()) activeId = threads[0].id;
+    renderThreads();
+    renderChat();
+  }
+  $("walletBtn").textContent = P.getAddress() ? shortAddr(P.getAddress()) : "wallet";
   P.requestWalletInfo();
   loadModels();
+  P.loadDirectory().catch(function () {});
 })();
