@@ -101,6 +101,7 @@
    * replacement so a band is a hedge, not the same top-N every turn.
    */
   function tierModels(tier, n, random, ids) {
+    if (tier === "auto") return [];
     var want = TIERS[tier] || TIERS.medium;
     var served = ids || catalogIds;
     var live = served

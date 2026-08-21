@@ -9,11 +9,18 @@ const GATEWAY = "https://x402-tokens.fly.dev";
 async function main() {
   const models = await (await fetch(GATEWAY + "/v1/models")).json();
   const ids = (models.data || []).map((m) => m.id);
+  if (!ids.includes("openzoo/auto")) {
+    throw new Error("expected openzoo/auto in /v1/models");
+  }
   if (!ids.includes("google/gemini-3.7-flash")) {
     throw new Error("expected google/gemini-3.7-flash in /v1/models");
   }
   if (ids.includes("openzoo")) throw new Error("do not use a fake openzoo model id");
-  console.log("ok  models (" + ids.length + ") includes google/gemini-3.7-flash");
+  const auto = (models.data || []).find((m) => m.id === "openzoo/auto");
+  if (!auto || auto.owned_by !== "openzoo") {
+    throw new Error("openzoo/auto must be owned_by openzoo");
+  }
+  console.log("ok  models (" + ids.length + ") includes openzoo/auto");
 
   const stats = await (await fetch(GATEWAY + "/v1/stats")).json();
   if (!stats.today || typeof stats.today.calls !== "number") {
