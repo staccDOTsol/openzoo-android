@@ -14,6 +14,7 @@
 
   var GATEWAY = "https://x402-tokens.fly.dev";
   var OCC_ORIGIN = "https://zoo.openzoo.fun";
+  var IDE_SESSION = "/api/ide/session";
   var DEFAULT_MODEL = "google/gemini-3.7-flash";
   var NAMESPACE = "stacc";
 
@@ -91,6 +92,7 @@
   return {
     GATEWAY: GATEWAY,
     OCC_ORIGIN: OCC_ORIGIN,
+    IDE_SESSION: IDE_SESSION,
     DEFAULT_MODEL: DEFAULT_MODEL,
     SYSTEM_PROMPT: SYSTEM_PROMPT,
     NAMESPACE: NAMESPACE,

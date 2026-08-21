@@ -6,10 +6,13 @@ Apache Cordova shell + **Google Play Billing** first-run.
 This is the same product as the desktop grokui client: **threads, chat**,
 **attach → bind behind the scenes**, a **race dial** (first X countable
 back of Y, default best 2 of 4 from a cheap / medium / expensive / grok4.6
-band), and **Agent** (hosted OCC — messages, `/goal`, file upload into the
-session folder, streamed in-app). Chat stays. Agent needs a Play
-subscription key (`Authorization: Bearer …`). No key → no Agent. Never
-`ANTHROPIC_API_KEY`. Never an open OCC URL. Subscription keys come from
+band), and **Agent** (cloud code-server + Cline — `POST`/`GET`
+`/api/ide/session` → `{ url, password?, id }`, load `url` full-bleed in
+`#agentFrame` / InAppBrowser, `viewport-fit=cover`, no nested scroll,
+no second composer on the IDE). Chat stays. Agent needs a Play subscription key
+(`Authorization: Bearer …`). No key → no Agent. Never
+`ANTHROPIC_API_KEY`. Never an open IDE URL. Store path is **IAP-only**
+(Play Billing). Subscription keys come from
 [zoo.openzoo.fun/subscriptions](https://zoo.openzoo.fun/subscriptions)
 (`GET https://zoo.openzoo.fun/api/billing/tiers`). Tagline:
 **Subscription keys · no x402**.
@@ -26,12 +29,12 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 |---|---|
 | App name | OpenZoo |
 | Widget id / applicationId | `fun.openzoo.android` |
-| Product | grokui: threads / chat / attach / hosted Agent |
+| Product | grokui: threads / chat / attach / cloud Agent |
 | First-run | Google Play Billing paywall |
 | Plans | Basic $9 · Pro $29 (Most teams want this) · Ultra $99 |
 | Play SKUs | `fun.openzoo.android.sub.basic` / `.pro` / `.ultra` |
 | Gateway | `https://x402-tokens.fly.dev` (chat / bind) |
-| Hosted OCC | `https://zoo.openzoo.fun/occ/*` (same door as iOS; Bearer subscription key) |
+| Cloud IDE | `POST`/`GET` `https://zoo.openzoo.fun/api/ide/session` → `{ url, password?, id }` (Bearer subscription key) |
 
 ## How it works
 
@@ -46,7 +49,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 │  │  grokui threads + Chat / Agent │  │
 │  │  race dial · racing k/n back   │  │
 │  │  attach files/folder/text      │  │
-│  │  Agent: messages + files → cwd │  │
+│  │  Agent: full-bleed #agentFrame │  │
 │  │  Settings → plan / change plan │  │
 │  └────────────────────────────────┘  │
 └──────────────────────────────────────┘
@@ -63,19 +66,19 @@ subscription API key that web Stripe checkout already mints via
 `GET /api/billing/key?session=`. Do not invent a second key system.
 Do not call `POST /api/billing/checkout` from Android.
 
-That minted key is also the hosted OCC Bearer. Agent never starts without
-it. Same door as iOS (`staccDOTsol/openzoo-ios#11`). Assumed routes
-(same origin as billing; not live yet — same gap as `/api/billing/play`):
+That minted key is also the Agent Bearer. Agent never starts without
+it. Assumed door (same origin as billing; not live yet — same gap as
+`/api/billing/play`):
 
 ```
-POST /occ/sessions                    { threadId, name } → { id } | { session_id }
-POST /occ/sessions/:id/messages       { text, message, stream: true }  # SSE
-POST /occ/sessions/:id/files          multipart file | { name, content, encoding: "base64" }
-POST /occ/sessions/:id/stop
+POST /api/ide/session                 { threadId, name } → { url, password?, id }
+GET  /api/ide/session                 resume → { url, password?, id }
 Authorization: Bearer <subscription key>
 ```
 
-A goal slash is a message string on `/messages`, not a separate route.
+Load only the returned `url` in the Agent webview. 401 → subscribe /
+restore Play. Hosted OCC routes may remain unused. This PR does not
+sideload or flash a build.
 
 Bind is **abstract**: the user attaches files, a folder, or pasted text.
 The UI never shows context ids, `/v1/bind`, or bind hashes. Chat history

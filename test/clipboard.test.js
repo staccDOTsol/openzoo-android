@@ -62,6 +62,7 @@ function load(rel) {
     "www/app/js/app.js",
     "www/app/js/pay.js",
     "www/js/billing.js",
+    "www/js/agent-host.js",
     "config.xml",
   ];
   const joined = files.map(load).join("\n");

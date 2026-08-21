@@ -5,7 +5,7 @@
   "description": "OpenZoo for Android 14+ / Google Play — grokui on a phone. Play Billing subscriptions only.",
   "main": "index.js",
   "scripts": {
-    "test": "node test/rails.test.js && node test/bind.test.js && node test/spill.test.js && node test/race.test.js && node test/billing.test.js && node test/clipboard.test.js && node test/dev-unlock.test.js && node test/occ.test.js && node test/smoke-gateway.js",
+    "test": "node test/rails.test.js && node test/bind.test.js && node test/spill.test.js && node test/race.test.js && node test/billing.test.js && node test/clipboard.test.js && node test/dev-unlock.test.js && node test/occ.test.js && node test/ide.test.js && node test/agent-host.test.js && node test/smoke-gateway.js",
     "test:rails": "node test/rails.test.js",
     "test:bind": "node test/bind.test.js",
     "test:spill": "node test/spill.test.js",
@@ -14,6 +14,8 @@
     "test:clipboard": "node test/clipboard.test.js",
     "test:dev-unlock": "node test/dev-unlock.test.js",
     "test:occ": "node test/occ.test.js",
+    "test:ide": "node test/ide.test.js",
+    "test:agent-host": "node test/agent-host.test.js",
     "test:gateway": "node test/smoke-gateway.js",
     "build": "cordova build android",
     "build:release": "cordova build android --release",

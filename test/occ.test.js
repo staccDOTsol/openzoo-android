@@ -222,7 +222,7 @@ chain.push(check("401/402 map to subscribe/restore, never x402", () => {
   assert.doesNotMatch(a.message + b.message, /x402|Phantom|wallet|Stripe/);
 }));
 
-chain.push(check("shipped UI keeps Chat, adds Agent, hides door URLs", () => {
+chain.push(check("hosted OCC client may remain unused; Agent UI is /api/ide/session", () => {
   const html = read("www/app/index.html");
   const app = read("www/app/js/app.js");
   const occ = read("www/app/js/occ.js");
@@ -230,18 +230,8 @@ chain.push(check("shipped UI keeps Chat, adds Agent, hides door URLs", () => {
   const pay = read("www/app/js/pay.js");
   const joined = html + app + occ + rails + pay;
   assert.match(html, /js\/occ\.js/);
-  assert.match(html, /id="modeToggle"/);
-  assert.match(html, /id="modeChat"/);
-  assert.match(html, /id="modeAgent"/);
-  assert.match(html, />Chat</);
-  assert.match(html, />Agent</);
-  assert.match(html, /id="goalTip"/);
-  assert.match(html, /id="agentStop"/);
-  assert.match(app, /OpenZooOcc/);
-  assert.match(app, /function startNewChat\(\) \{ newThread\(\); \}/);
-  assert.match(app, /ensureOccSession/);
-  assert.match(app, /agentSend/);
-  assert.match(app, /uploadAgentItems/);
+  assert.match(occ, /\/occ\/sessions/);
+  assert.doesNotMatch(app, /OpenZooOcc|ensureOccSession|agentSend|uploadAgentItems/);
   assert.doesNotMatch(html, /\/api\/occ|node-pty|:8402|ANTHROPIC_API_KEY/);
   assert.doesNotMatch(app, /ANTHROPIC_API_KEY|node-pty|pty\.spawn|localhost:8402/);
   assert.doesNotMatch(occ, /ANTHROPIC_API_KEY\s*[:=]/);
@@ -261,7 +251,7 @@ chain.push(check("Play IAP still entitles the key; store path is not x402", () =
   assert.doesNotMatch(handoff, /\/api\/occ/);
   assert.doesNotMatch(readme, /\/api\/occ/);
   assert.match(handoff, /Authorization: Bearer/);
-  assert.match(readme, /hosted OCC/);
+  assert.match(readme, /\/ide\/session/);
   assert.doesNotMatch(shell, /\/api\/billing\/checkout|checkout\.stripe\.com/);
   assert.doesNotMatch(occ + app, /\/api\/billing\/checkout|checkout\.stripe\.com|X-PAYMENT|walletPayEnabled/);
   assert.doesNotMatch(handoff, /jarettrsdunn1999@gmail\.com/);

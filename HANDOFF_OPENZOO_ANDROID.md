@@ -37,13 +37,17 @@ bind hashes.
 
 **Chat** stays completions + race + abstract bind on the gateway.
 
-**Agent** is hosted OCC (not local node-pty). Messages, `/goal`, and file
-upload go to the session cwd on the hosted door. Stream the reply in-app.
-No subscription key → no Agent. Never `ANTHROPIC_API_KEY`. Never an open
-OCC URL.
+**Agent** is cloud code-server + Cline (not hosted OCC, not local node-pty).
+`POST`/`GET` `/api/ide/session` with the Play subscription Bearer returns
+`{ url, password?, id }`. Load `url` full-bleed in `#agentFrame` (or
+Cordova InAppBrowser on device). `viewport-fit=cover`. No nested scroll
+trapping. Do not overlay a second composer on the IDE. No subscription
+key → no Agent. Never `ANTHROPIC_API_KEY`. Never an open IDE URL. 401 →
+subscribe / restore Play. Hosted OCC routes may remain unused.
 
 Do **not** port RUN / WRITE / READ / SERVE onto Chat. Those stay off this
-phone chat path. Hosted Agent is a remote OCC session, not those directives.
+phone chat path. Agent is a remote code-server + Cline session, not those
+directives.
 
 Do **not** open Chrome/Stripe as the primary path. Do **not** add Phantom,
 MWA, a local burner, wrap, or x402.
@@ -81,35 +85,35 @@ the Play token locally. Backend TODO: verify the token with the Google
 Play Developer API and mint the **same** key Stripe already mints.
 Do not invent a second key system.
 
-That same Play-minted key is the **only** auth for hosted OCC / upload.
-Every OCC call sends `Authorization: Bearer <subscription key>`.
+That same Play-minted key is the **only** auth for Agent. Every
+`/api/ide/session` call sends `Authorization: Bearer <subscription key>`.
+Store Android stays **Play Billing / IAP only** — no x402, no MWA pay
+bypass. This change does not sideload or flash a build.
 
-## Hosted OCC door (assumed routes)
+## Cloud IDE door (`/api/ide/session`)
 
 Door lives on `staccDOTsol/openzoo` / openzoo.fun. This app uses the same
 API origin it already uses for billing: **`https://zoo.openzoo.fun`**.
 
-Same door as iOS PR `staccDOTsol/openzoo-ios#11`. Do not invent a second
-API. These routes were **not live** when this client shipped (HTML 404/500,
-same class of gap as `POST /api/billing/play`):
+Do not invent a second API. These routes were **not live** when this
+client shipped (HTML 500 "Only HTML requests are supported here", same
+class of gap as `POST /api/billing/play`):
 
 | Method | Path | Body |
 |---|---|---|
-| `POST` | `/occ/sessions` | `{ threadId, name }` → `{ id }` or `{ session_id }` |
-| `GET` | `/occ/sessions/:id` | optional probe — not required |
-| `POST` | `/occ/sessions/:id/messages` | `{ text, message, stream: true }` — SSE. A goal slash is just a message string. |
-| `POST` | `/occ/sessions/:id/files` | multipart `file` or JSON `{ name, content, encoding: "base64" }` |
-| `POST` | `/occ/sessions/:id/stop` | interrupt |
-
-SSE events: `{ type: delta|text|output|status|pty|done|error }` and
-OpenAI-style `{ choices: [{ delta: { content } }] }`.
+| `POST` | `/api/ide/session` | optional `{ threadId, name }` → `{ url, password?, id }` |
+| `GET` | `/api/ide/session` | resume — same `{ url, password?, id }` (`?id=` if we already have one) |
 
 Every row above: `Authorization: Bearer <OpenZoo subscription key>`.
 No key → the Agent chip stays locked and Chat still works. A 401/402/403
 is subscribe/restore Play, never an x402 or Stripe prompt. HTML 404/501
-is "hosted Agent is not live yet."
+is "cloud Agent is not live yet." Load only the returned `url` in the
+Agent webview — never a hardcoded open IDE.
 
-Do not point Agent at localhost, a sidecar, or an unauthenticated OCC URL.
+Hosted OCC (`/occ/sessions`, messages, files, stop) may remain in-tree
+unused.
+
+Do not point Agent at localhost, a sidecar, or an unauthenticated URL.
 
 ## What this tree is
 
@@ -122,11 +126,13 @@ a stored entitlement it iframes `www/app/index.html` (chat). Do not retarget
 www/index.html                      Play paywall shell — purchase / restore, then iframe
 www/js/billing.js                   tiers, product IDs, Play token → key exchange stub
 www/app/index.html                  grokui threads + Chat/Agent + attach + Settings
-www/app/js/rails.js                 gateway + OCC origin + subscription Bearer key
+www/app/js/rails.js                 gateway + zoo origin + subscription Bearer key
 www/app/js/bind.js                  abstract attach → corpus (Chat)
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
-www/app/js/occ.js                   hosted OCC: /occ/sessions + messages + files + stop
+www/app/js/ide.js                   cloud code-server + Cline: POST/GET /api/ide/session
+www/js/agent-host.js                full-bleed #agentFrame / InAppBrowser (no second composer)
+www/app/js/occ.js                   unused hosted OCC client (door may stay dark)
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
 cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
@@ -139,8 +145,9 @@ Keep the existing split: the shell owns Play; the UI never sees a key.
 labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Chat / bind talk to `https://x402-tokens.fly.dev`. That hostname is the
-gateway, not an in-app x402 pay UI. Hosted Agent talks to
-`https://zoo.openzoo.fun/occ/*` with the Play subscription Bearer.
+gateway, not an in-app x402 pay UI. Agent talks to
+`https://zoo.openzoo.fun/api/ide/session` with the Play subscription Bearer,
+then loads the returned URL in the Agent webview.
 
 Long threads use the same spill as `npx openzoo claude`: bind the transcript
 prefix to a per-thread context id, then POST system + last few turns with
