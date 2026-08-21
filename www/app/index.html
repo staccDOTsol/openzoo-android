@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy"
-  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
+  content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self' https:;">
 <meta name="openzoo-connect" content="https://zoo.openzoo.fun https://x402-tokens.fly.dev">
 <title>openzoo</title>
 <style>
@@ -59,9 +59,18 @@
   #modeToggle.locked .modebtn.agent { opacity: .4; }
   body.agent-mode #model, body.agent-mode #tierSel, body.agent-mode #raceSel { display: none; }
   #goalTip { display: none; font-size: 11px; color: #8e8e93; padding: 0 4px 6px; }
-  body.agent-mode #goalTip { display: block; }
   #agentStop { display: none; }
-  body.agent-mode #agentStop { display: inline-flex; }
+  #idePane {
+    display: none; flex: 1; min-width: 0; min-height: 0; position: relative;
+    background: #000; flex-direction: column;
+  }
+  body.agent-mode #idePane { display: flex; }
+  body.agent-mode #log, body.agent-mode #hud, body.agent-mode #bar { display: none; }
+  #ideFrame {
+    flex: 1; width: 100%; min-height: 0; border: 0; background: #000;
+  }
+  #ideStatus { display: none; padding: 16px; color: #8e8e93; font-size: 13px; }
+  #ideStatus.show { display: block; }
   #headerNewBtn {
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
     background: #fff; color: #000; border: 0; border-radius: 999px;
@@ -195,6 +204,10 @@
       </div>
     </div>
     <div id="log"></div>
+    <div id="idePane" data-component="agent-ide">
+      <div id="ideStatus"></div>
+      <iframe id="ideFrame" title="Agent" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    </div>
     <div id="hud"></div>
     <div id="statusLine"></div>
     <div id="bar">
@@ -224,7 +237,7 @@
   <div id="settingsOverlay">
     <div class="sheet">
       <h3>Settings</h3>
-      <p class="wsub">Google Play subscription. Basic $9 / Pro $29 / Ultra $99. Agent uses that same key.</p>
+      <p class="wsub">Google Play subscription. Basic $9 / Pro $29 / Ultra $99. Agent opens cloud code-server + Cline with that same key.</p>
       <div id="planBody" class="wbal">loading plan…</div>
       <div class="actions">
         <button class="ghost" id="changePlanBtn" type="button">Change plan</button>
@@ -250,6 +263,7 @@
 <script src="js/spill.js"></script>
 <script src="js/race.js"></script>
 <script src="js/occ.js"></script>
+<script src="js/ide.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>
 </body>

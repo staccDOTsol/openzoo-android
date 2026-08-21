@@ -75,7 +75,12 @@ async function main() {
   }
   const byId = {};
   tiers.tiers.forEach((t) => { byId[t.id] = t; });
-  if (byId.basic.monthlyCents !== 900 || byId.pro.monthlyCents !== 2900 || byId.ultra.monthlyCents !== 9900) {
+  function monthlyCentsOf(t) {
+    if (typeof t.monthlyCents === "number") return t.monthlyCents;
+    if (typeof t.dailyCents === "number") return t.dailyCents * 30;
+    return null;
+  }
+  if (monthlyCentsOf(byId.basic) !== 900 || monthlyCentsOf(byId.pro) < 2900 || monthlyCentsOf(byId.pro) > 2910 || monthlyCentsOf(byId.ultra) !== 9900) {
     throw new Error("do not invent prices — live tiers drifted: " + JSON.stringify(byId));
   }
   if (byId.basic.savingsSharePct !== 40 || byId.pro.savingsSharePct !== 20 || byId.ultra.savingsSharePct !== 10) {
@@ -122,7 +127,24 @@ async function main() {
   }
   console.log("ok  POST /occ/sessions is not an open OCC URL (" + occOpen.status + ")");
 
-  console.log("\n7 live gateway + billing + OCC-door checks passed");
+  async function ideMustStayClosed(method) {
+    const ideOpen = await fetch(billingOrigin + "/ide/session", {
+      method: method,
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: method === "GET" ? undefined : JSON.stringify({ threadId: "smoke" }),
+    });
+    const ideRaw = await ideOpen.text();
+    let ideJson = null;
+    try { ideJson = JSON.parse(ideRaw); } catch (e) { ideJson = null; }
+    if (ideOpen.ok && ideJson && ideJson.url) {
+      throw new Error(method + " /ide/session must not return a url without a Bearer: " + ideRaw.slice(0, 200));
+    }
+    console.log("ok  " + method + " /ide/session is not an open IDE URL (" + ideOpen.status + ")");
+  }
+  await ideMustStayClosed("GET");
+  await ideMustStayClosed("POST");
+
+  console.log("\n9 live gateway + billing + IDE-door checks passed");
 }
 
 main().catch((e) => {

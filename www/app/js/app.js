@@ -6,7 +6,7 @@
   var B = window.OpenZooBind;
   var S = window.OpenZooSpill;
   var C = window.OpenZooRace;
-  var O = window.OpenZooOcc;
+  var I = window.OpenZooIde;
   var $ = function (id) { return document.getElementById(id); };
   var STORE = "openzoo.android.grokui.v1";
   var PALETTE = ["#e91e8c", "#34c759", "#ff9500", "#5e5ce6", "#ff3b30", "#0a84ff", "#00c7be"];
@@ -26,6 +26,7 @@
     if (typeof t.raceNeed !== "number") t.raceNeed = C ? C.DEFAULT_NEED : 2;
     if (!t.runMode) t.runMode = "chat";
     if (!t.occSession) t.occSession = null;
+    if (!t.ideSession) t.ideSession = null;
     if (t.goalSet == null) t.goalSet = false;
     return t;
   });
@@ -78,8 +79,9 @@
       spent: 0,
       direct: 0,
       calls: 0,
-      runMode: O ? O.defaultRunMode(hasOccKey()) : "chat",
+      runMode: I ? I.defaultRunMode(hasAgentKey()) : "chat",
       occSession: null,
+      ideSession: null,
       goalSet: false,
       updatedAt: Date.now(),
     };
@@ -192,6 +194,8 @@
     syncDials();
     renderHud();
     applyAgentMode(threadMode(t) === "agent");
+    if (t && threadMode(t) === "agent") openAgentIde(t);
+    else clearIdeFrame();
     if (!t || !t.messages.length) {
       bubble(welcomeCopy(t), false);
     } else {
@@ -400,7 +404,10 @@
 
   function addItems(files) {
     var t = ensureThread();
-    if (O && threadMode(t) === "agent") return uploadAgentItems(t, files);
+    if (threadMode(t) === "agent") {
+      setStatus("Agent is cloud code-server + Cline. Attach files inside the IDE.");
+      return Promise.resolve();
+    }
     var jobs = [];
     Array.prototype.forEach.call(files || [], function (f) {
       if (!B.looksText(f.name, f.type)) return;
@@ -420,32 +427,62 @@
     return R.getSubscriptionKey ? R.getSubscriptionKey() : null;
   }
 
-  function hasOccKey() {
-    return !!(O && O.isUsableKey(currentKey()));
+  function hasAgentKey() {
+    return !!(I && I.isUsableKey(currentKey()));
   }
 
   function threadMode(t) {
-    return O ? O.normalizeRunMode(t && t.runMode) : "chat";
+    return I ? I.normalizeRunMode(t && t.runMode) : "chat";
   }
 
   function welcomeCopy(t) {
     if (threadMode(t) === "agent") {
-      return "welcome — Agent is hosted OCC. send a message, /goal <job>, or attach files into the session folder. needs a Play subscription key. Chat is still one tap away.";
+      return "welcome — Agent is cloud code-server + Cline. needs a Play subscription key. Chat is still one tap away.";
     }
     return "welcome — pick a band, race a few models if you want, attach notes, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.";
+  }
+
+  function setIdeStatus(msg) {
+    var el = $("ideStatus");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.classList.toggle("show", !!msg);
+  }
+
+  function clearIdeFrame() {
+    var frame = $("ideFrame");
+    if (frame) {
+      frame.removeAttribute("src");
+      try { frame.src = "about:blank"; } catch (e) { /* ignore */ }
+    }
+  }
+
+  function loadIdeFrame(session) {
+    var src = I && I.frameSrc(session);
+    var frame = $("ideFrame");
+    if (!frame || !src) {
+      clearIdeFrame();
+      return false;
+    }
+    setIdeStatus("");
+    if (frame.getAttribute("src") !== src) frame.src = src;
+    return true;
   }
 
   function applyAgentMode(agent) {
     document.body.classList.toggle("agent-mode", !!agent);
     if ($("modeChat")) $("modeChat").className = "modebtn chat" + (!agent ? " on" : "");
     if ($("modeAgent")) $("modeAgent").className = "modebtn agent" + (agent ? " on" : "");
-    if ($("modeToggle")) $("modeToggle").classList.toggle("locked", !hasOccKey());
-    if ($("inp")) $("inp").placeholder = agent ? "Message or /goal …" : "Message";
+    if ($("modeToggle")) $("modeToggle").classList.toggle("locked", !hasAgentKey());
+    if ($("inp")) $("inp").placeholder = "Message";
+    if (!agent) {
+      setIdeStatus("");
+    }
   }
 
   function setThreadMode(mode) {
-    var next = O ? O.normalizeRunMode(mode) : "chat";
-    if (next === "agent" && !hasOccKey()) {
+    var next = I ? I.normalizeRunMode(mode) : "chat";
+    if (next === "agent" && !hasAgentKey()) {
       setStatus("Subscribe with Google Play to use Agent.");
       next = "chat";
     }
@@ -456,133 +493,41 @@
     renderChat();
   }
 
-  function ensureOccSession(t) {
-    if (!hasOccKey()) return Promise.reject(new O.OccAuthError());
-    if (t.occSession && t.occSession.id) return Promise.resolve(t.occSession);
+  function rememberIdeSession(t, sess) {
+    t.ideSession = { id: sess && sess.id || "" };
+    persist();
+    return sess;
+  }
+
+  function openAgentIde(t) {
+    if (!I) return Promise.resolve();
+    if (!hasAgentKey()) {
+      clearIdeFrame();
+      setIdeStatus("Subscribe with Google Play to use Agent.");
+      setStatus("Subscribe with Google Play to use Agent.");
+      return Promise.resolve();
+    }
+    setIdeStatus("starting Agent…");
     setStatus("starting Agent…");
-    return O.createSession({
+    return I.ensureSession({
       key: currentKey(),
-      threadId: t.id,
-      name: t.name || t.id,
+      id: t && t.ideSession && t.ideSession.id,
+      threadId: t && t.id,
+      name: (t && t.name) || (t && t.id),
     }).then(function (sess) {
-      t.occSession = { id: sess.id };
-      persist();
+      rememberIdeSession(t, sess);
+      if (!loadIdeFrame(sess)) {
+        setIdeStatus("cloud Agent is not live yet. Chat still works.");
+        setStatus("cloud Agent is not live yet. Chat still works.");
+        return sess;
+      }
       setStatus("");
-      return t.occSession;
-    });
-  }
-
-  function paintOccStream(thinking) {
-    var streamed = "";
-    return {
-      text: function () { return streamed; },
-      onEvent: function (ev) {
-        if (!ev) return;
-        if (ev.type === "status" && ev.text) {
-          setStatus(ev.text);
-          return;
-        }
-        if (ev.type === "error") throw new Error(ev.error || "hosted Agent error");
-        if (ev.text && (ev.type === "delta" || ev.type === "text")) {
-          streamed += ev.text;
-          thinking.textContent = streamed;
-          $("log").scrollTop = $("log").scrollHeight;
-        }
-      },
-    };
-  }
-
-  function agentSend(t, text, thinking) {
-    if (!hasOccKey()) {
-      thinking.textContent = "Subscribe with Google Play to use Agent.";
-      return Promise.resolve();
-    }
-    var goal = O.goalFromMessage ? O.goalFromMessage(text) : null;
-    if (goal === "") {
-      thinking.textContent = "usage: /goal <job> — one slash. Agent keeps working until it's done.";
-      t.messages.push({ role: "assistant", content: thinking.textContent });
-      persist();
-      return Promise.resolve();
-    }
-    var retried = false;
-    function run(forceNew) {
-      if (forceNew) t.occSession = null;
-      return ensureOccSession(t).then(function (sess) {
-        var stream = paintOccStream(thinking);
-        var opts = { key: currentKey(), onEvent: stream.onEvent };
-        return O.postMessage(sess.id, text, opts).then(function () {
-          if (goal != null) t.goalSet = true;
-          var content = stream.text() || (goal != null ? "goal set." : "(no Agent output)");
-          thinking.textContent = content;
-          t.messages.push({ role: "assistant", content: content });
-          persist();
-          setStatus("");
-        });
-      }).catch(function (e) {
-        if (!retried && e && (e.name === "OccDoorUnavailableError" || e.status === 404)) {
-          retried = true;
-          t.occSession = null;
-          persist();
-          if (e.name === "OccDoorUnavailableError") throw e;
-          return run(true);
-        }
-        throw e;
-      });
-    }
-    return run(false).catch(function (e) {
-      thinking.textContent = O.userVisibleOccError(e);
-    });
-  }
-
-  function uploadAgentItems(t, files) {
-    if (!hasOccKey()) {
-      setStatus("Subscribe with Google Play to use Agent.");
-      return Promise.resolve();
-    }
-    return ensureOccSession(t).then(function (sess) {
-      var jobs = [];
-      Array.prototype.forEach.call(files || [], function (f) {
-        var name = B.fileLabel(f.webkitRelativePath || f.name);
-        jobs.push(O.uploadFile(sess.id, {
-          name: name,
-          blob: f,
-          relativePath: f.webkitRelativePath || name,
-        }, { key: currentKey() }).then(function (up) {
-          t.items.push({ name: up.name || name, uploaded: true });
-        }));
-      });
-      return Promise.all(jobs);
-    }).then(function () {
-      persist();
-      renderAttachChips();
-      refreshSend();
-      setStatus(t.items.length
-        ? ("uploaded " + t.items.length + " file" + (t.items.length === 1 ? "" : "s") + " to Agent")
-        : "");
+      return sess;
     }).catch(function (e) {
-      setStatus(O.userVisibleOccError(e));
-    });
-  }
-
-  function uploadPastedNote(t, text) {
-    if (!hasOccKey()) {
-      setStatus("Subscribe with Google Play to use Agent.");
-      return Promise.resolve();
-    }
-    return ensureOccSession(t).then(function (sess) {
-      return O.uploadFile(sess.id, {
-        name: "note.txt",
-        text: text,
-        relativePath: "note.txt",
-      }, { key: currentKey() });
-    }).then(function (up) {
-      t.items.push({ name: up.name || "note.txt", uploaded: true });
-      persist();
-      renderAttachChips();
-      refreshSend();
-      setStatus("uploaded note.txt to Agent");
-    }).catch(function (e) {
-      setStatus(O.userVisibleOccError(e));
+      clearIdeFrame();
+      var msg = I.userVisibleIdeError(e);
+      setIdeStatus(msg);
+      setStatus(msg);
     });
   }
 
@@ -615,11 +560,12 @@
     var thinking = bubble("…", false);
     thinking.innerHTML = "<span class=\"dots\"><span></span><span></span><span></span></span>";
 
-    if (O && threadMode(t) === "agent") {
-      agentSend(t, text || "look at what I attached", thinking).then(function () {
-        busy = false;
-        renderThreads();
-      });
+    if (threadMode(t) === "agent") {
+      thinking.textContent = "Agent is cloud code-server + Cline. Use the IDE above.";
+      t.messages.push({ role: "assistant", content: thinking.textContent });
+      persist();
+      busy = false;
+      openAgentIde(t);
       return;
     }
 
@@ -838,8 +784,8 @@
     var t = ensureThread();
     $("pasteBox").value = "";
     $("pasteOverlay").classList.remove("show");
-    if (O && threadMode(t) === "agent") {
-      uploadPastedNote(t, text);
+    if (threadMode(t) === "agent") {
+      setStatus("Agent is cloud code-server + Cline. Attach files inside the IDE.");
       return;
     }
     t.items.push({ name: "note.txt", text: text });
@@ -854,8 +800,10 @@
   if ($("agentStop")) {
     $("agentStop").onclick = function () {
       var t = active();
-      if (!t || !t.occSession || !t.occSession.id || !hasOccKey()) return;
-      O.stopSession(t.occSession.id, { key: currentKey() }).catch(function () {});
+      if (!t || threadMode(t) !== "agent") return;
+      t.ideSession = null;
+      persist();
+      openAgentIde(t);
     };
   }
   $("settingsBtn").onclick = openSettings;
@@ -889,11 +837,14 @@
   window.addEventListener("openzoo-billing", function () {
     if ($("planBody")) $("planBody").textContent = planLabel();
     var t = active();
-    applyAgentMode(threadMode(t) === "agent" && hasOccKey());
-    if (t && threadMode(t) === "agent" && !hasOccKey()) {
+    applyAgentMode(threadMode(t) === "agent" && hasAgentKey());
+    if (t && threadMode(t) === "agent" && !hasAgentKey()) {
       t.runMode = "chat";
       persist();
       applyAgentMode(false);
+      clearIdeFrame();
+    } else if (t && threadMode(t) === "agent") {
+      openAgentIde(t);
     }
   });
 

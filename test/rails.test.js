@@ -80,15 +80,17 @@ check("chat spill is Claude-CLI style: prefix bind + tail, never full+header", (
   assert.doesNotMatch(spill, /function spawn|PING:|childKickoff|worktree/);
 });
 
-check("hosted OCC is zoo.openzoo.fun /occ, same door as iOS", () => {
+check("cloud Agent door is zoo.openzoo.fun /ide/session; OCC may stay unused", () => {
+  const ide = require("../www/app/js/ide.js");
   const occ = require("../www/app/js/occ.js");
-  assert.strictEqual(occ.OCC_ORIGIN, R.OCC_ORIGIN);
-  assert.strictEqual(occ.OCC_ORIGIN, "https://zoo.openzoo.fun");
+  assert.strictEqual(ide.IDE_ORIGIN, R.OCC_ORIGIN);
+  assert.strictEqual(ide.IDE_ORIGIN, "https://zoo.openzoo.fun");
+  assert.strictEqual(ide.SESSION, "/ide/session");
+  assert.strictEqual(R.IDE_SESSION, "/ide/session");
+  assert.doesNotMatch(ide.SESSION, /\/api\/occ|\/occ\//);
+  assert.ok(ide.isUsableKey("oz_sub_live_key"));
+  assert.ok(!ide.isUsableKey("openzoo"));
   assert.strictEqual(occ.SESSIONS, "/occ/sessions");
-  assert.strictEqual(occ.OCC_PATHS.files("s1"), "/occ/sessions/s1/files");
-  assert.doesNotMatch(occ.SESSIONS, /\/api\/occ/);
-  assert.ok(occ.isUsableKey("oz_sub_live_key"));
-  assert.ok(!occ.isUsableKey("openzoo"));
 });
 
 check("no @solana/web3.js dependency and no :8402", () => {
@@ -102,6 +104,7 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/spill.js",
     "www/app/js/race.js",
     "www/app/js/occ.js",
+    "www/app/js/ide.js",
     "www/js/clipboard.js",
     "www/js/billing.js",
   ].map(read).join("\n");
@@ -154,7 +157,8 @@ check("Cordova entry is the Play paywall, then iframe chat — not a wallet shel
   assert.match(chat, /id="headerNewBtn"/);
   assert.match(chat, /id="sideNewBtn"/);
   assert.match(chat, /id="modeToggle"/);
-  assert.match(chat, /js\/occ\.js/);
+  assert.match(chat, /js\/ide\.js/);
+  assert.match(chat, /id="ideFrame"/);
 });
 
 check("dark launch loader stays up until chrome-ready, not models or Play", () => {
