@@ -13,8 +13,10 @@
   "use strict";
 
   var GATEWAY = "https://x402-tokens.fly.dev";
-  var DEFAULT_MODEL = "google/gemini-3.7-flash";
+  var AUTO_MODEL = "openzoo/auto";
+  var DEFAULT_MODEL = AUTO_MODEL;
   var NAMESPACE = "stacc";
+  var RACE_TIERS = { cheap: true, medium: true, expensive: true, "grok4.6": true };
 
   var SYSTEM_PROMPT =
     "You are OpenZoo on a phone — the same product as the grokui desktop client, " +
@@ -70,17 +72,52 @@
     return "Connection dropped. Try again when you are back online.";
   }
 
+  function isAutoModel(id) {
+    var s = String(id == null ? "" : id).trim();
+    return !s || /^auto$/i.test(s) || s === AUTO_MODEL;
+  }
+
+  function isRaceTier(tier) {
+    return !!RACE_TIERS[String(tier || "").trim()];
+  }
+
+  /**
+   * Auto is one door request: { model: "openzoo/auto" }. The server classifies.
+   * Named ids stay named. Race is only an explicit cheap/medium/expensive/grok4.6
+   * band plus a race of 2+ — never a stand-in for Auto.
+   */
+  function planTurn(input) {
+    input = input || {};
+    var raw = String(input.model == null ? "" : input.model).trim();
+    var tier = String(input.tier == null ? "" : input.tier).trim();
+    var n = Number(input.n) || 0;
+    var k = Number(input.k) || 1;
+    if (raw && !isAutoModel(raw)) {
+      return { mode: "single", model: raw };
+    }
+    if (isRaceTier(tier) && n >= 2) {
+      return { mode: "race", tier: tier, n: n, k: k };
+    }
+    return { mode: "auto", model: AUTO_MODEL };
+  }
+
+  function shouldRace(input) {
+    return planTurn(input).mode === "race";
+  }
+
+  function resolveRequestModel(raw) {
+    var s = String(raw == null ? "" : raw).trim();
+    return isAutoModel(s) ? AUTO_MODEL : s;
+  }
+
   function defaultModelId(models) {
     var list = (models || []).filter(function (m) {
       return m && m.id && m.id.charAt(0) !== "~" && m.id.indexOf(":batch") === -1;
     });
     for (var i = 0; i < list.length; i++) {
-      if (list[i].id === DEFAULT_MODEL) return list[i].id;
+      if (list[i].id === AUTO_MODEL) return list[i].id;
     }
-    for (var j = 0; j < list.length; j++) {
-      if (list[j].id.indexOf("gemini") !== -1) return list[j].id;
-    }
-    return list[0] ? list[0].id : DEFAULT_MODEL;
+    return DEFAULT_MODEL;
   }
 
   function maxTokensFor(model) {
@@ -89,6 +126,7 @@
 
   return {
     GATEWAY: GATEWAY,
+    AUTO_MODEL: AUTO_MODEL,
     DEFAULT_MODEL: DEFAULT_MODEL,
     SYSTEM_PROMPT: SYSTEM_PROMPT,
     NAMESPACE: NAMESPACE,
@@ -100,6 +138,11 @@
     looksNetworkGarbage: looksNetworkGarbage,
     friendlyNetworkMessage: friendlyNetworkMessage,
     defaultModelId: defaultModelId,
+    isAutoModel: isAutoModel,
+    isRaceTier: isRaceTier,
+    planTurn: planTurn,
+    shouldRace: shouldRace,
+    resolveRequestModel: resolveRequestModel,
     maxTokensFor: maxTokensFor,
     setSubscriptionKey: setSubscriptionKey,
     getSubscriptionKey: getSubscriptionKey,

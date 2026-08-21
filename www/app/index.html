@@ -153,11 +153,14 @@
       </div>
       <button type="button" id="headerNewBtn" data-component="new-chat">New chat</button>
       <div id="headerDials">
-        <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
-        <datalist id="modelList"></datalist>
+        <input class="dial" id="model" list="modelList" placeholder="Auto" autocomplete="off">
+        <datalist id="modelList">
+          <option value="openzoo/auto" label="Auto"></option>
+        </datalist>
         <select class="dial" id="tierSel" data-component="model-tier" aria-label="Model band">
+          <option value="auto" selected>Auto</option>
           <option value="cheap">cheap</option>
-          <option value="medium" selected>medium</option>
+          <option value="medium">medium</option>
           <option value="expensive">expensive</option>
           <option value="grok4.6">grok4.6</option>
         </select>

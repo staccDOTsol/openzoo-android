@@ -20,7 +20,7 @@
     if (!t || typeof t !== "object") return t;
     if (t.boundPrefix == null) t.boundPrefix = "";
     if (typeof t.direct !== "number") t.direct = 0;
-    if (!t.tier) t.tier = "medium";
+    if (!t.tier) t.tier = "auto";
     if (typeof t.race !== "number") t.race = C ? C.DEFAULT_N : 4;
     if (typeof t.raceNeed !== "number") t.raceNeed = C ? C.DEFAULT_NEED : 2;
     return t;
@@ -68,7 +68,7 @@
       boundPrefix: "",
       corpus: "",
       model: $("model") ? $("model").value : "",
-      tier: $("tierSel") ? $("tierSel").value : "medium",
+      tier: $("tierSel") ? $("tierSel").value : "auto",
       race: C ? C.parseRaceDial($("raceSel") && $("raceSel").value).n : 4,
       raceNeed: C ? C.parseRaceDial($("raceSel") && $("raceSel").value).k : 2,
       spent: 0,
@@ -180,12 +180,12 @@
     $("headAv").textContent = initials(t ? t.name : "OZ");
     $("headAv").style.background = t ? (t.color || colorFor(t.name)) : "#5e5ce6";
     if (t && t.model) $("model").value = t.model;
-    if (t && $("tierSel")) $("tierSel").value = t.tier || "medium";
+    if (t && $("tierSel")) $("tierSel").value = t.tier || "auto";
     if (t && $("raceSel") && C) $("raceSel").value = C.formatRaceDial({ k: t.raceNeed, n: t.race });
     syncDials();
     renderHud();
     if (!t || !t.messages.length) {
-      bubble("welcome — pick a band, race a few models if you want, attach notes, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.", false);
+      bubble("welcome — Auto lets the server pick a model. pick a band and race a few if you want, attach notes, and say anything. this phone app cannot run, write, read, or serve local files. calls use your Play subscription key.", false);
     } else {
       t.messages.forEach(function (m) {
         bubble(m.content, m.role === "user", m.meta || "");
@@ -249,11 +249,17 @@
 
   function syncDials() {
     var spec = raceSpec();
-    var racing = spec.n >= 2;
+    var plan = R.planTurn({
+      model: $("model") && $("model").value,
+      tier: $("tierSel") && $("tierSel").value,
+      n: spec.n,
+      k: spec.k,
+    });
+    var racing = plan.mode === "race";
     if ($("model")) $("model").classList.toggle("hidden-dial", racing);
     if ($("tierSel")) {
       var tier = $("tierSel").value;
-      $("tierSel").classList.toggle("hot", racing || tier === "expensive" || tier === "grok4.6");
+      $("tierSel").classList.toggle("hot", racing || tier === "auto" || tier === "expensive" || tier === "grok4.6");
     }
     if ($("raceSel")) $("raceSel").classList.toggle("hot", racing);
   }
@@ -429,8 +435,22 @@
     var thinking = bubble("…", false);
     thinking.innerHTML = "<span class=\"dots\"><span></span><span></span><span></span></span>";
 
-    var model = $("model").value || t.model || R.DEFAULT_MODEL;
-    t.model = model;
+    var spec = raceSpec();
+    var rawModel = ($("model") && $("model").value) || t.model || "";
+    var tier = ($("tierSel") && $("tierSel").value) || t.tier || "auto";
+    var plan = R.planTurn({
+      model: rawModel,
+      tier: tier,
+      n: spec.n,
+      k: spec.k,
+    });
+    t.tier = plan.mode === "race" ? plan.tier : (tier || "auto");
+    if (plan.mode === "race") {
+      t.race = spec.n;
+      t.raceNeed = spec.k;
+    } else {
+      t.model = plan.model;
+    }
 
     function runPaid(req, signal) {
       return P.paidFetch("/v1/chat/completions", {
@@ -467,15 +487,14 @@
     }
 
     function raceTurn(force) {
-      var spec = raceSpec();
-      var tier = ($("tierSel") && $("tierSel").value) || t.tier || "medium";
-      t.tier = tier;
+      var raceTier = plan.tier || ($("tierSel") && $("tierSel").value) || t.tier;
+      t.tier = raceTier;
       t.race = spec.n;
       t.raceNeed = spec.k;
-      var models = C.tierModels(tier, spec.n, true, C.getCatalog());
+      var models = C.tierModels(raceTier, spec.n, true, C.getCatalog());
       var need = Math.min(spec.k, models.length);
       if (models.length < 2) {
-        var fallback = models[0] || model;
+        var fallback = models[0] || plan.model || R.DEFAULT_MODEL;
         t.model = fallback;
         return singleTurn(fallback);
       }
@@ -545,15 +564,14 @@
       });
     }
 
-    var spec = raceSpec();
-    var job = (C && spec.n >= 2)
+    var job = (C && plan.mode === "race")
       ? raceTurn(false).catch(function (e) {
         if (!e || e.name !== "ContextNotFoundError") throw e;
         t.ctx = null;
         t.boundPrefix = "";
         return raceTurn(true);
       })
-      : singleTurn(model);
+      : singleTurn(plan.model);
 
     job.catch(function (e) {
       if (e && e.name === "SubscriptionRequiredError") {
@@ -576,11 +594,21 @@
           return m.id && m.id.charAt(0) !== "~" && m.id.indexOf(":batch") === -1;
         });
         models.sort(function (a, b) { return a.id.localeCompare(b.id); });
+        var autoAt = -1;
+        for (var i = 0; i < models.length; i++) {
+          if (models[i].id === R.AUTO_MODEL) { autoAt = i; break; }
+        }
+        if (autoAt > 0) {
+          models.unshift(models.splice(autoAt, 1)[0]);
+        } else if (autoAt === -1) {
+          models.unshift({ id: R.AUTO_MODEL });
+        }
         var dl = $("modelList");
         dl.innerHTML = "";
         models.forEach(function (m) {
           var o = document.createElement("option");
           o.value = m.id;
+          if (m.id === R.AUTO_MODEL) o.label = "Auto";
           dl.appendChild(o);
         });
         if (C) C.setCatalog(models.map(function (m) { return m.id; }));

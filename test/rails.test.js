@@ -30,13 +30,82 @@ check("namespace header is unsigned stacc", () => {
   assert.strictEqual(h["x-openzoo-namespace"], "stacc");
 });
 
-check("defaults to google/gemini-3.7-flash, never a fake openzoo id", () => {
+check("defaults to openzoo/auto from the catalog, never a gemini pin", () => {
+  assert.strictEqual(R.DEFAULT_MODEL, "openzoo/auto");
+  assert.strictEqual(R.AUTO_MODEL, "openzoo/auto");
   const id = R.defaultModelId([
     { id: "~hidden" },
     { id: "openai/gpt-4o-mini" },
     { id: "google/gemini-3.7-flash" },
+    { id: "openzoo/auto" },
   ]);
-  assert.strictEqual(id, "google/gemini-3.7-flash");
+  assert.strictEqual(id, "openzoo/auto");
+  assert.strictEqual(R.defaultModelId([
+    { id: "openai/gpt-4o-mini" },
+    { id: "google/gemini-3.7-flash" },
+  ]), "openzoo/auto");
+});
+
+check("Auto emits openzoo/auto and does not call classify", () => {
+  const C = require("../www/app/js/race.js");
+  const plan = R.planTurn({ model: "", tier: "auto", n: 4, k: 2 });
+  assert.strictEqual(plan.mode, "auto");
+  assert.strictEqual(plan.model, "openzoo/auto");
+  assert.strictEqual(R.shouldRace({ model: "", tier: "auto", n: 4, k: 2 }), false);
+  assert.strictEqual(R.shouldRace({ model: "Auto", tier: "auto", n: 4, k: 2 }), false);
+  assert.strictEqual(R.shouldRace({ model: "openzoo/auto", n: 4, k: 2 }), false);
+  assert.deepStrictEqual(
+    { model: R.resolveRequestModel(""), messages: [{ role: "user", content: "hi" }] },
+    { model: "openzoo/auto", messages: [{ role: "user", content: "hi" }] },
+  );
+
+  let classifyCalls = 0;
+  function dispatch(input, runners) {
+    const p = R.planTurn(input);
+    if (p.mode === "race") return runners.race();
+    return runners.single({ model: p.model, messages: input.messages });
+  }
+  const body = dispatch(
+    { model: "", tier: "auto", n: 4, k: 2, messages: [{ role: "user", content: "hi" }] },
+    {
+      race: function () {
+        classifyCalls += 1;
+        return C.runRace({
+          messages: [{ role: "user", content: "hi" }],
+          models: ["a", "b"],
+          need: 2,
+          hooks: {
+            run: function (m) { return m + "-ans"; },
+            classify: function () { classifyCalls += 1; return 9; },
+          },
+        });
+      },
+      single: function (req) { return req; },
+    },
+  );
+  assert.deepStrictEqual(body, {
+    model: "openzoo/auto",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  assert.strictEqual(classifyCalls, 0);
+
+  const app = read("www/app/js/app.js");
+  assert.match(app, /planTurn/);
+  assert.match(app, /mode === "race"/);
+  assert.match(app, /singleTurn\(plan\.model\)/);
+  assert.doesNotMatch(app, /TaskClassifier|tiny-classif|classifyPrompt/);
+});
+
+check("named models stay named; explicit band + race 2+ still races", () => {
+  const named = R.planTurn({ model: "x-ai/grok-4.6", tier: "medium", n: 4, k: 2 });
+  assert.strictEqual(named.mode, "single");
+  assert.strictEqual(named.model, "x-ai/grok-4.6");
+  assert.strictEqual(R.resolveRequestModel("x-ai/grok-4.6"), "x-ai/grok-4.6");
+  const race = R.planTurn({ model: "", tier: "medium", n: 4, k: 2 });
+  assert.strictEqual(race.mode, "race");
+  assert.strictEqual(race.tier, "medium");
+  const leftoverAuto = R.planTurn({ model: "openzoo/auto", tier: "cheap", n: 4, k: 2 });
+  assert.strictEqual(leftoverAuto.mode, "race");
 });
 
 check("system prompt does not claim RUN/WRITE/READ/SERVE", () => {
@@ -113,6 +182,9 @@ check("UI never shows context ids, /v1/bind, hashes, or wallet chrome", () => {
   assert.match(html, />New chat</);
   assert.match(html, /id="raceSel"/);
   assert.match(html, /id="tierSel"/);
+  assert.match(html, /placeholder="Auto"/);
+  assert.match(html, /value="auto" selected/);
+  assert.match(html, /value="openzoo\/auto"/);
   assert.match(html, /#headerNewBtn\s*\{[\s\S]*?display:\s*inline-flex/);
   assert.doesNotMatch(html, /id="headerNewBtn"[^>]*class="dial"/);
   assert.doesNotMatch(html, /#headerNewBtn\s*\{\s*display:\s*none/);

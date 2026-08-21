@@ -69,6 +69,9 @@ function checkSync() {
     assert.ok(C.TIERS.medium.includes("google/gemini-3.7-flash"));
     assert.ok(C.TIERS.expensive.includes("x-ai/grok-4.6"));
     assert.strictEqual(C.JUDGE_MODEL, "deepseek/deepseek-v4-flash");
+    assert.ok(!C.TIER_NAMES.includes("auto"));
+    assert.ok(!Object.prototype.hasOwnProperty.call(C.TIERS, "auto"));
+    assert.deepStrictEqual(C.tierModels("auto", 4, false), []);
   });
 
   check("tierModels samples without replacement from the live catalog", () => {
@@ -173,6 +176,8 @@ function checkSync() {
     assert.match(html, /id="raceSel"/);
     assert.match(html, /id="tierSel"/);
     assert.match(html, /value="2 4" selected/);
+    assert.match(html, /value="auto" selected/);
+    assert.match(html, /placeholder="Auto"/);
     assert.match(html, /value="grok4\.6"/);
     assert.match(app, /OpenZooRace/);
     assert.match(app, /raceTurn/);
