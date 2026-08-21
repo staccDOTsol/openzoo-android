@@ -13,6 +13,7 @@
   "use strict";
 
   var GATEWAY = "https://x402-tokens.fly.dev";
+  var OCC_ORIGIN = "https://zoo.openzoo.fun";
   var DEFAULT_MODEL = "google/gemini-3.7-flash";
   var NAMESPACE = "stacc";
 
@@ -89,6 +90,7 @@
 
   return {
     GATEWAY: GATEWAY,
+    OCC_ORIGIN: OCC_ORIGIN,
     DEFAULT_MODEL: DEFAULT_MODEL,
     SYSTEM_PROMPT: SYSTEM_PROMPT,
     NAMESPACE: NAMESPACE,

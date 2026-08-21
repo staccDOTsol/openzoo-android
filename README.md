@@ -4,9 +4,12 @@ Generic **OpenZoo** for any Android 14+ phone, shipped via Google Play.
 Apache Cordova shell + **Google Play Billing** first-run.
 
 This is the same product as the desktop grokui client: **threads, chat**,
-**attach → bind behind the scenes**, and a **race dial** (first X countable
+**attach → bind behind the scenes**, a **race dial** (first X countable
 back of Y, default best 2 of 4 from a cheap / medium / expensive / grok4.6
-band). Subscription keys come from
+band), and **Agent** (hosted OCC — messages, `/goal`, file upload into the
+session folder, streamed in-app). Chat stays. Agent needs a Play
+subscription key (`Authorization: Bearer …`). No key → no Agent. Never
+`ANTHROPIC_API_KEY`. Never an open OCC URL. Subscription keys come from
 [zoo.openzoo.fun/subscriptions](https://zoo.openzoo.fun/subscriptions)
 (`GET https://zoo.openzoo.fun/api/billing/tiers`). Tagline:
 **Subscription keys · no x402**.
@@ -23,11 +26,12 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 |---|---|
 | App name | OpenZoo |
 | Widget id / applicationId | `fun.openzoo.android` |
-| Product | grokui: threads / chat / attach |
+| Product | grokui: threads / chat / attach / hosted Agent |
 | First-run | Google Play Billing paywall |
 | Plans | Basic $9 · Pro $29 (Most teams want this) · Ultra $99 |
 | Play SKUs | `fun.openzoo.android.sub.basic` / `.pro` / `.ultra` |
 | Gateway | `https://x402-tokens.fly.dev` (chat / bind) |
+| Hosted OCC | `https://zoo.openzoo.fun/api/occ/*` (Agent; Bearer subscription key) |
 
 ## How it works
 
@@ -39,9 +43,10 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 │  • exchange token → subscription key │
 │  ┌────────────────────────────────┐  │
 │  │ iframe: www/app/               │  │
-│  │  grokui threads + chat         │  │
+│  │  grokui threads + Chat / Agent │  │
 │  │  race dial · racing k/n back   │  │
 │  │  attach files/folder/text      │  │
+│  │  Agent: /goal + upload → cwd   │  │
 │  │  Settings → plan / change plan │  │
 │  └────────────────────────────────┘  │
 └──────────────────────────────────────┘
@@ -57,6 +62,20 @@ verify the token with the Google Play Developer API and mint the **same**
 subscription API key that web Stripe checkout already mints via
 `GET /api/billing/key?session=`. Do not invent a second key system.
 Do not call `POST /api/billing/checkout` from Android.
+
+That minted key is also the hosted OCC Bearer. Agent never starts without
+it. Assumed door (same origin as billing; not live yet — 404 HTML, same
+gap as `/api/billing/play`):
+
+```
+POST /api/occ/sessions
+GET  /api/occ/sessions/:id
+POST /api/occ/sessions/:id/messages   # SSE / NDJSON / JSON
+POST /api/occ/sessions/:id/goal
+POST /api/occ/sessions/:id/upload     # multipart → session cwd
+POST /api/occ/sessions/:id/stop
+Authorization: Bearer <subscription key>
+```
 
 Bind is **abstract**: the user attaches files, a folder, or pasted text.
 The UI never shows context ids, `/v1/bind`, or bind hashes. Chat history

@@ -32,9 +32,18 @@ x402 pay path. Store Android stays Play Billing only.
 ## Product scope
 
 Ship the grokui client on this Cordova shell: **threads / chat / attach /
-race**. Bind is abstract — never show context ids, `/v1/bind`, or bind hashes.
+race / Agent**. Bind is abstract — never show context ids, `/v1/bind`, or
+bind hashes.
 
-Do **not** port RUN / WRITE / READ / SERVE. Those stay off this app.
+**Chat** stays completions + race + abstract bind on the gateway.
+
+**Agent** is hosted OCC (not local node-pty). Messages, `/goal`, and file
+upload go to the session cwd on the hosted door. Stream the reply in-app.
+No subscription key → no Agent. Never `ANTHROPIC_API_KEY`. Never an open
+OCC URL.
+
+Do **not** port RUN / WRITE / READ / SERVE onto Chat. Those stay off this
+phone chat path. Hosted Agent is a remote OCC session, not those directives.
 
 Do **not** open Chrome/Stripe as the primary path. Do **not** add Phantom,
 MWA, a local burner, wrap, or x402.
@@ -72,6 +81,33 @@ the Play token locally. Backend TODO: verify the token with the Google
 Play Developer API and mint the **same** key Stripe already mints.
 Do not invent a second key system.
 
+That same Play-minted key is the **only** auth for hosted OCC / upload.
+Every OCC call sends `Authorization: Bearer <subscription key>`.
+
+## Hosted OCC door (assumed routes)
+
+Door lives on `staccDOTsol/openzoo` / openzoo.fun. This app uses the same
+API origin it already uses for billing: **`https://zoo.openzoo.fun`**.
+
+These routes were **not live** when this client shipped (404 HTML, same
+class of gap as `POST /api/billing/play`). The Android client assumes:
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| `POST` | `/api/occ/sessions` | `{ threadId, model? }` | `{ id, cwd?, status? }` |
+| `GET` | `/api/occ/sessions/:id` | — | `{ id, cwd?, status? }` |
+| `POST` | `/api/occ/sessions/:id/messages` | `{ text }` | SSE / NDJSON / JSON stream |
+| `POST` | `/api/occ/sessions/:id/goal` | `{ goal }` | SSE / NDJSON / JSON stream |
+| `POST` | `/api/occ/sessions/:id/upload` | multipart `file` + `relativePath` | `{ ok, name, path? }` |
+| `POST` | `/api/occ/sessions/:id/stop` | `{}` | `{ ok }` |
+
+Every row above: `Authorization: Bearer <OpenZoo subscription key>`.
+No key → the Agent chip stays locked and Chat still works. A 401/402/403
+is subscribe/restore Play, never an x402 or Stripe prompt. HTML 404/501
+is "hosted Agent is not live yet."
+
+Do not point Agent at localhost, a sidecar, or an unauthenticated OCC URL.
+
 ## What this tree is
 
 Cordova `<content src="index.html">` is the **Play paywall**, not a wallet
@@ -82,11 +118,12 @@ a stored entitlement it iframes `www/app/index.html` (chat). Do not retarget
 ```
 www/index.html                      Play paywall shell — purchase / restore, then iframe
 www/js/billing.js                   tiers, product IDs, Play token → key exchange stub
-www/app/index.html                  grokui threads + composer + attach + Settings (plan)
-www/app/js/rails.js                 gateway + subscription Bearer key
-www/app/js/bind.js                  abstract attach → corpus
+www/app/index.html                  grokui threads + Chat/Agent + attach + Settings
+www/app/js/rails.js                 gateway + OCC origin + subscription Bearer key
+www/app/js/bind.js                  abstract attach → corpus (Chat)
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
+www/app/js/occ.js                   hosted OCC: session / message / goal / upload / stream
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
 cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
@@ -99,7 +136,8 @@ Keep the existing split: the shell owns Play; the UI never sees a key.
 labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Chat / bind talk to `https://x402-tokens.fly.dev`. That hostname is the
-gateway, not an in-app x402 pay UI.
+gateway, not an in-app x402 pay UI. Hosted Agent talks to
+`https://zoo.openzoo.fun/api/occ/*` with the Play subscription Bearer.
 
 Long threads use the same spill as `npx openzoo claude`: bind the transcript
 prefix to a per-thread context id, then POST system + last few turns with

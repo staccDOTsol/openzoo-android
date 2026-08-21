@@ -80,6 +80,15 @@ check("chat spill is Claude-CLI style: prefix bind + tail, never full+header", (
   assert.doesNotMatch(spill, /function spawn|PING:|childKickoff|worktree/);
 });
 
+check("hosted OCC is zoo.openzoo.fun /api/occ, not a local sidecar", () => {
+  const occ = require("../www/app/js/occ.js");
+  assert.strictEqual(occ.OCC_ORIGIN, R.OCC_ORIGIN);
+  assert.strictEqual(occ.OCC_ORIGIN, "https://zoo.openzoo.fun");
+  assert.match(occ.SESSIONS, /^\/api\/occ\/sessions$/);
+  assert.ok(occ.isUsableKey("oz_sub_live_key"));
+  assert.ok(!occ.isUsableKey("openzoo"));
+});
+
 check("no @solana/web3.js dependency and no :8402", () => {
   const joined = [
     "www/index.html",
@@ -90,6 +99,7 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/bind.js",
     "www/app/js/spill.js",
     "www/app/js/race.js",
+    "www/app/js/occ.js",
     "www/js/clipboard.js",
     "www/js/billing.js",
   ].map(read).join("\n");
@@ -113,6 +123,12 @@ check("UI never shows context ids, /v1/bind, hashes, or wallet chrome", () => {
   assert.match(html, />New chat</);
   assert.match(html, /id="raceSel"/);
   assert.match(html, /id="tierSel"/);
+  assert.match(html, /id="modeToggle"/);
+  assert.match(html, /id="modeChat"/);
+  assert.match(html, /id="modeAgent"/);
+  assert.match(html, />Chat</);
+  assert.match(html, />Agent</);
+  assert.doesNotMatch(html, /\/api\/occ|ANTHROPIC_API_KEY|node-pty/);
   assert.match(html, /#headerNewBtn\s*\{[\s\S]*?display:\s*inline-flex/);
   assert.doesNotMatch(html, /id="headerNewBtn"[^>]*class="dial"/);
   assert.doesNotMatch(html, /#headerNewBtn\s*\{\s*display:\s*none/);
@@ -135,6 +151,8 @@ check("Cordova entry is the Play paywall, then iframe chat — not a wallet shel
   assert.doesNotMatch(chat, /<script[^>]+(wallet|solana|wrap|nacl|pay402|clipboard)/i);
   assert.match(chat, /id="headerNewBtn"/);
   assert.match(chat, /id="sideNewBtn"/);
+  assert.match(chat, /id="modeToggle"/);
+  assert.match(chat, /js\/occ\.js/);
 });
 
 check("dark launch loader stays up until chrome-ready, not models or Play", () => {
