@@ -131,7 +131,7 @@
           : "Subscribe with Google Play to use Agent."
       );
     }
-    if ((status === 404 || status === 405 || status === 501) && (looksHtml(raw) || !body)) {
+    if ((status === 404 || status === 405 || status === 500 || status === 501) && (looksHtml(raw) || !body)) {
       return new OccDoorUnavailableError();
     }
     var err = new Error(errText((body && (body.error || body.message)) || raw || ("HTTP " + status)));

@@ -176,7 +176,7 @@ chain.push(check("no key never hits the door", async () => {
   assert.strictEqual(hit, false);
 }));
 
-chain.push(check("HTML 404 door is unavailable, not a fake local PTY", async () => {
+chain.push(check("HTML 404/500 door is unavailable, not a fake local PTY", async () => {
   try {
     await O.createSession({
       key: "oz_sub_live_key",
@@ -187,6 +187,15 @@ chain.push(check("HTML 404 door is unavailable, not a fake local PTY", async () 
     assert.strictEqual(e.name, "OccDoorUnavailableError");
     assert.match(e.message, /Chat still works/);
     assert.doesNotMatch(e.message, /zoo\.openzoo\.fun|\/api\/occ|node-pty|:8402/);
+  }
+  try {
+    await O.createSession({
+      key: "oz_sub_live_key",
+      fetchImpl: async () => htmlRes(500),
+    });
+    assert.fail("should fail");
+  } catch (e) {
+    assert.strictEqual(e.name, "OccDoorUnavailableError");
   }
 }));
 
