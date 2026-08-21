@@ -225,13 +225,13 @@ chain.push(check("shipped UI loads Agent webview from /ide/session; Chat unchang
   assert.match(html, /id="modeAgent"/);
   assert.match(html, />Chat</);
   assert.match(html, />Agent</);
-  assert.match(html, /id="idePane"/);
-  assert.match(html, /id="ideFrame"/);
+  assert.match(html, /id="agentFrame"/);
+  assert.match(html, /viewport-fit=cover/);
   assert.match(html, /frame-src 'self' https:/);
   assert.match(app, /OpenZooIde/);
   assert.match(app, /function startNewChat\(\) \{ newThread\(\); \}/);
   assert.match(app, /openAgentIde/);
-  assert.match(app, /loadIdeFrame/);
+  assert.match(app, /loadAgentFrame/);
   assert.match(app, /I\.ensureSession/);
   assert.match(app, /I\.frameSrc/);
   assert.doesNotMatch(app, /ensureOccSession|agentSend|uploadAgentItems|OpenZooOcc/);

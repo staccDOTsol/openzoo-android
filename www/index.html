@@ -5,19 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self'; media-src 'self';">
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://zoo.openzoo.fun https://x402-tokens.fly.dev; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self' https:; media-src 'self';">
   <title>OpenZoo</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #000; }
+    html, body { width: 100%; height: 100%; height: 100dvh; background: #000; }
     body {
       display: flex; flex-direction: column; align-items: center;
-      min-height: 100vh; color: #ececec;
+      min-height: 100vh; min-height: 100dvh; color: #ececec;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
       padding: 28px 16px 72px;
       padding-top: max(28px, env(safe-area-inset-top));
-      overflow-y: auto;
+      overflow-y: auto; overscroll-behavior: none;
     }
+    html.agent-open, body.agent-open {
+      overflow: hidden !important; overscroll-behavior: none; touch-action: none;
+    }
+    #agentFrame {
+      display: none; position: fixed; inset: 0;
+      width: 100%; height: 100%; height: 100dvh; height: 100svh;
+      border: 0; background: #000; z-index: 20000;
+      padding: 0; margin: 0; overflow: hidden;
+    }
+    #agentFrame.show { display: block; }
+    #agentExit {
+      display: none; position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      z-index: 20001; background: #fff; color: #000; border: 0;
+      border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 700;
+    }
+    body.agent-open #agentExit:not([hidden]) { display: inline-flex; }
     .logo { width: 72px; height: 72px; border-radius: 18px; overflow: hidden; margin-bottom: 12px; background: #123; }
     .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .tag { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #b8f240; margin-bottom: 8px; }
@@ -59,6 +77,8 @@
   </style>
 </head>
 <body>
+  <iframe id="agentFrame" title="Agent" hidden allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  <button type="button" id="agentExit" hidden>Chat</button>
   <div id="oz-boot" aria-live="polite">starting<span class="oz-dot">.</span><span class="oz-dot">.</span><span class="oz-dot">.</span></div>
   <div class="logo"><img src="img/token.jpg" alt="OpenZoo"></div>
   <div class="tag" id="tagline">Subscription keys · no x402</div>
@@ -94,6 +114,7 @@
 
   <script src="cordova.js"></script>
   <script src="js/billing.js"></script>
+  <script src="js/agent-host.js"></script>
   <script>
   'use strict';
 
@@ -362,10 +383,33 @@
 
     if (data.type === 'billing-sign-out') {
       persistBilling({});
+      if (window.OpenZooAgentHost) window.OpenZooAgentHost.close();
       showPaywall();
       return;
     }
+
+    if (data.type === 'openzoo-agent-open' && data.url && window.OpenZooAgentHost) {
+      window.OpenZooAgentHost.open(data.url, {
+        onExit: function () {
+          notifyApp('openzoo-agent-closed');
+        },
+      });
+      return;
+    }
+
+    if (data.type === 'openzoo-agent-close' && window.OpenZooAgentHost) {
+      window.OpenZooAgentHost.close();
+      return;
+    }
   });
+
+  var $agentExit = document.getElementById('agentExit');
+  if ($agentExit) {
+    $agentExit.onclick = function () {
+      if (window.OpenZooAgentHost) window.OpenZooAgentHost.close();
+      notifyApp('openzoo-agent-closed');
+    };
+  }
 
   function playUnlockStatus() {
     return new Promise(function (resolve) {

@@ -42,6 +42,7 @@ function walkFiles(dir, acc) {
     "www/app/js/rails.js",
     "www/app/js/occ.js",
     "www/app/js/ide.js",
+    "www/js/agent-host.js",
     "README.md",
     "HANDOFF_OPENZOO_ANDROID.md",
     "package.json",

@@ -195,7 +195,7 @@
     renderHud();
     applyAgentMode(threadMode(t) === "agent");
     if (t && threadMode(t) === "agent") openAgentIde(t);
-    else clearIdeFrame();
+    else clearAgentFrame();
     if (!t || !t.messages.length) {
       bubble(welcomeCopy(t), false);
     } else {
@@ -449,27 +449,57 @@
     el.classList.toggle("show", !!msg);
   }
 
-  function clearIdeFrame() {
-    var frame = $("ideFrame");
+  function hasParentHost() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function postAgent(type, extra) {
+    if (!hasParentHost()) return;
+    var msg = Object.assign({ type: type }, extra || {});
+    window.parent.postMessage(msg, "*");
+  }
+
+  function clearAgentFrame() {
+    postAgent("openzoo-agent-close");
+    if (window.OpenZooAgentHost) window.OpenZooAgentHost.close();
+    var frame = $("agentFrame");
     if (frame) {
+      frame.hidden = true;
+      frame.classList.remove("show");
       frame.removeAttribute("src");
       try { frame.src = "about:blank"; } catch (e) { /* ignore */ }
     }
   }
 
-  function loadIdeFrame(session) {
+  function loadAgentFrame(session) {
     var src = I && I.frameSrc(session);
-    var frame = $("ideFrame");
-    if (!frame || !src) {
-      clearIdeFrame();
+    if (!src) {
+      clearAgentFrame();
       return false;
     }
     setIdeStatus("");
+    if (hasParentHost()) {
+      var local = $("agentFrame");
+      if (local) {
+        local.hidden = true;
+        local.classList.remove("show");
+      }
+      postAgent("openzoo-agent-open", { url: src });
+      return true;
+    }
+    if (window.OpenZooAgentHost) {
+      return !!window.OpenZooAgentHost.open(src);
+    }
+    var frame = $("agentFrame");
+    if (!frame) return false;
+    frame.hidden = false;
+    frame.classList.add("show");
     if (frame.getAttribute("src") !== src) frame.src = src;
     return true;
   }
 
   function applyAgentMode(agent) {
+    document.documentElement.classList.toggle("agent-mode", !!agent);
     document.body.classList.toggle("agent-mode", !!agent);
     if ($("modeChat")) $("modeChat").className = "modebtn chat" + (!agent ? " on" : "");
     if ($("modeAgent")) $("modeAgent").className = "modebtn agent" + (agent ? " on" : "");
@@ -502,7 +532,7 @@
   function openAgentIde(t) {
     if (!I) return Promise.resolve();
     if (!hasAgentKey()) {
-      clearIdeFrame();
+      clearAgentFrame();
       setIdeStatus("Subscribe with Google Play to use Agent.");
       setStatus("Subscribe with Google Play to use Agent.");
       return Promise.resolve();
@@ -516,7 +546,7 @@
       name: (t && t.name) || (t && t.id),
     }).then(function (sess) {
       rememberIdeSession(t, sess);
-      if (!loadIdeFrame(sess)) {
+      if (!loadAgentFrame(sess)) {
         setIdeStatus("cloud Agent is not live yet. Chat still works.");
         setStatus("cloud Agent is not live yet. Chat still works.");
         return sess;
@@ -524,7 +554,7 @@
       setStatus("");
       return sess;
     }).catch(function (e) {
-      clearIdeFrame();
+      clearAgentFrame();
       var msg = I.userVisibleIdeError(e);
       setIdeStatus(msg);
       setStatus(msg);
@@ -540,6 +570,12 @@
       $("inp").value = "";
       refreshSend();
       setThreadMode(modeCmd[1]);
+      return;
+    }
+    if (threadMode(t) === "agent") {
+      $("inp").value = "";
+      refreshSend();
+      openAgentIde(t);
       return;
     }
     busy = true;
@@ -561,10 +597,8 @@
     thinking.innerHTML = "<span class=\"dots\"><span></span><span></span><span></span></span>";
 
     if (threadMode(t) === "agent") {
-      thinking.textContent = "Agent is cloud code-server + Cline. Use the IDE above.";
-      t.messages.push({ role: "assistant", content: thinking.textContent });
-      persist();
       busy = false;
+      if (thinking && thinking.parentNode) thinking.parentNode.remove();
       openAgentIde(t);
       return;
     }
@@ -797,6 +831,7 @@
   $("pasteClose").onclick = function () { $("pasteOverlay").classList.remove("show"); };
   if ($("modeChat")) $("modeChat").onclick = function () { setThreadMode("chat"); };
   if ($("modeAgent")) $("modeAgent").onclick = function () { setThreadMode("agent"); };
+  if ($("agentExit")) $("agentExit").onclick = function () { setThreadMode("chat"); };
   if ($("agentStop")) {
     $("agentStop").onclick = function () {
       var t = active();
@@ -842,9 +877,22 @@
       t.runMode = "chat";
       persist();
       applyAgentMode(false);
-      clearIdeFrame();
+      clearAgentFrame();
     } else if (t && threadMode(t) === "agent") {
       openAgentIde(t);
+    }
+  });
+
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (!data || data.type !== "openzoo-agent-closed") return;
+    var t = active();
+    if (t && threadMode(t) === "agent") {
+      t.runMode = "chat";
+      persist();
+      applyAgentMode(false);
+      clearAgentFrame();
+      renderChat();
     }
   });
 

@@ -39,7 +39,9 @@ bind hashes.
 
 **Agent** is cloud code-server + Cline (not hosted OCC, not local node-pty).
 `POST`/`GET` `/ide/session` with the Play subscription Bearer returns
-`{ url, password?, id }`. Load `url` in the Agent webview. No subscription
+`{ url, password?, id }`. Load `url` full-bleed in `#agentFrame` (or
+Cordova InAppBrowser on device). `viewport-fit=cover`. No nested scroll
+trapping. Do not overlay a second composer on the IDE. No subscription
 key → no Agent. Never `ANTHROPIC_API_KEY`. Never an open IDE URL. 401 →
 subscribe / restore Play. Hosted OCC routes may remain unused.
 
@@ -129,6 +131,7 @@ www/app/js/bind.js                  abstract attach → corpus (Chat)
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
 www/app/js/ide.js                   cloud code-server + Cline: POST/GET /ide/session
+www/js/agent-host.js                full-bleed #agentFrame / InAppBrowser (no second composer)
 www/app/js/occ.js                   unused hosted OCC client (door may stay dark)
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack

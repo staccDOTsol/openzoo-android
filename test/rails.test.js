@@ -105,6 +105,7 @@ check("no @solana/web3.js dependency and no :8402", () => {
     "www/app/js/race.js",
     "www/app/js/occ.js",
     "www/app/js/ide.js",
+    "www/js/agent-host.js",
     "www/js/clipboard.js",
     "www/js/billing.js",
   ].map(read).join("\n");
@@ -158,7 +159,7 @@ check("Cordova entry is the Play paywall, then iframe chat — not a wallet shel
   assert.match(chat, /id="sideNewBtn"/);
   assert.match(chat, /id="modeToggle"/);
   assert.match(chat, /js\/ide\.js/);
-  assert.match(chat, /id="ideFrame"/);
+  assert.match(chat, /id="agentFrame"/);
 });
 
 check("dark launch loader stays up until chrome-ready, not models or Play", () => {

@@ -7,8 +7,9 @@ This is the same product as the desktop grokui client: **threads, chat**,
 **attach → bind behind the scenes**, a **race dial** (first X countable
 back of Y, default best 2 of 4 from a cheap / medium / expensive / grok4.6
 band), and **Agent** (cloud code-server + Cline — `POST`/`GET`
-`/ide/session` → `{ url, password?, id }`, load `url` in the Agent
-webview). Chat stays. Agent needs a Play subscription key
+`/ide/session` → `{ url, password?, id }`, load `url` full-bleed in
+`#agentFrame` / InAppBrowser, `viewport-fit=cover`, no nested scroll,
+no second composer on the IDE). Chat stays. Agent needs a Play subscription key
 (`Authorization: Bearer …`). No key → no Agent. Never
 `ANTHROPIC_API_KEY`. Never an open IDE URL. Store path is **IAP-only**
 (Play Billing). Subscription keys come from
@@ -48,7 +49,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 │  │  grokui threads + Chat / Agent │  │
 │  │  race dial · racing k/n back   │  │
 │  │  attach files/folder/text      │  │
-│  │  Agent: code-server + Cline    │  │
+│  │  Agent: full-bleed #agentFrame │  │
 │  │  Settings → plan / change plan │  │
 │  └────────────────────────────────┘  │
 └──────────────────────────────────────┘

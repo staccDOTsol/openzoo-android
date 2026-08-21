@@ -10,9 +10,9 @@
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; }
+  html, body { margin: 0; height: 100%; height: 100dvh; background: #000; }
   body { color: #ececec; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-         display: flex; height: 100%; overflow: hidden; }
+         display: flex; height: 100%; height: 100dvh; overflow: hidden; overscroll-behavior: none; }
   #sidebar {
     width: 280px; flex: 0 0 280px; border-right: 1px solid #1c1c1e; display: flex; flex-direction: column;
     height: 100%; background: #000; z-index: 40;
@@ -58,18 +58,30 @@
   .modebtn.agent.on { background: #f28c4d; color: #1a0f08; }
   #modeToggle.locked .modebtn.agent { opacity: .4; }
   body.agent-mode #model, body.agent-mode #tierSel, body.agent-mode #raceSel { display: none; }
-  #goalTip { display: none; font-size: 11px; color: #8e8e93; padding: 0 4px 6px; }
-  #agentStop { display: none; }
-  #idePane {
-    display: none; flex: 1; min-width: 0; min-height: 0; position: relative;
-    background: #000; flex-direction: column;
+  #goalTip { display: none !important; font-size: 11px; color: #8e8e93; padding: 0 4px 6px; }
+  #agentStop { display: none !important; }
+  body.agent-mode, html.agent-mode { overflow: hidden !important; overscroll-behavior: none; }
+  body.agent-mode #sidebar, body.agent-mode #scrim,
+  body.agent-mode #chatHeader, body.agent-mode #log, body.agent-mode #hud,
+  body.agent-mode #statusLine, body.agent-mode #bar, body.agent-mode #plusMenu,
+  body.agent-mode #attachChips, body.agent-mode #goalTip { display: none !important; }
+  #agentFrame {
+    display: none; position: fixed; inset: 0;
+    width: 100%; height: 100%; height: 100dvh; height: 100svh;
+    border: 0; background: #000; z-index: 90; overflow: hidden;
+    padding: 0; margin: 0;
   }
-  body.agent-mode #idePane { display: flex; }
-  body.agent-mode #log, body.agent-mode #hud, body.agent-mode #bar { display: none; }
-  #ideFrame {
-    flex: 1; width: 100%; min-height: 0; border: 0; background: #000;
+  body.agent-mode #agentFrame.show { display: block; }
+  #agentExit {
+    display: none; position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 100; background: #fff; color: #000; border: 0;
+    border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 700;
   }
-  #ideStatus { display: none; padding: 16px; color: #8e8e93; font-size: 13px; }
+  body.agent-mode #agentExit { display: inline-flex; }
+  #ideStatus { display: none; position: fixed; inset: 0; z-index: 91;
+               padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 16px 16px; color: #8e8e93; font-size: 13px; }
   #ideStatus.show { display: block; }
   #headerNewBtn {
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
@@ -204,10 +216,9 @@
       </div>
     </div>
     <div id="log"></div>
-    <div id="idePane" data-component="agent-ide">
-      <div id="ideStatus"></div>
-      <iframe id="ideFrame" title="Agent" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
-    </div>
+    <iframe id="agentFrame" title="Agent" hidden allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+    <button type="button" id="agentExit">Chat</button>
+    <div id="ideStatus"></div>
     <div id="hud"></div>
     <div id="statusLine"></div>
     <div id="bar">
@@ -264,6 +275,7 @@
 <script src="js/race.js"></script>
 <script src="js/occ.js"></script>
 <script src="js/ide.js"></script>
+<script src="../js/agent-host.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>
 </body>
