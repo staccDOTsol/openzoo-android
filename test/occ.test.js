@@ -62,9 +62,13 @@ const chain = [];
 chain.push(check("origin is this app's existing API host, not an open OCC URL", () => {
   assert.strictEqual(O.OCC_ORIGIN, "https://zoo.openzoo.fun");
   assert.strictEqual(O.OCC_ORIGIN, R.CONNECT_ORIGINS[0]);
-  assert.strictEqual(O.SESSIONS, "/api/occ/sessions");
-  assert.strictEqual(O.sessionPath("abc"), "/api/occ/sessions/abc");
-  assert.ok(O.sessionUrl("abc").startsWith("https://zoo.openzoo.fun/api/occ/"));
+  assert.strictEqual(O.SESSIONS, "/occ/sessions");
+  assert.strictEqual(O.sessionPath("abc"), "/occ/sessions/abc");
+  assert.ok(O.sessionUrl("abc").startsWith("https://zoo.openzoo.fun/occ/"));
+  assert.strictEqual(O.OCC_PATHS.messages("abc"), "/occ/sessions/abc/messages");
+  assert.strictEqual(O.OCC_PATHS.files("abc"), "/occ/sessions/abc/files");
+  assert.strictEqual(O.OCC_PATHS.stop("abc"), "/occ/sessions/abc/stop");
+  assert.doesNotMatch(O.SESSIONS + O.sessionPath("x"), /\/api\/occ/);
   assert.doesNotMatch(O.OCC_ORIGIN, /localhost|:8402|anthropic|claude\.ai/i);
 }));
 
@@ -87,13 +91,17 @@ chain.push(check("occHeaders requires a real Bearer and never ANTHROPIC_API_KEY"
   assert.ok(!Object.keys(h).some((k) => /anthropic/i.test(k)));
 }));
 
-chain.push(check("/goal is first-class; empty goal stays local", () => {
+chain.push(check("/goal is a message string, not a separate route", () => {
   assert.strictEqual(O.goalFromMessage("hello"), null);
   assert.strictEqual(O.goalFromMessage("/goal build the app"), "build the app");
   assert.strictEqual(O.goalFromMessage("/GOAL   ship it  "), "ship it");
   assert.strictEqual(O.goalFromMessage("/goal"), "");
   assert.ok(O.isGoalCommand("/goal x"));
   assert.ok(!O.isGoalCommand("goal x"));
+  const occ = read("www/app/js/occ.js");
+  const app = read("www/app/js/app.js");
+  assert.doesNotMatch(occ, /\/occ\/sessions\/[^"'`\n]*\/goal|postGoal|\/upload/);
+  assert.doesNotMatch(app, /postGoal|\/occ\/sessions\/[^"'`\n]*\/goal|\/upload/);
 }));
 
 chain.push(check("run mode: agent vs chat; no key defaults chat", () => {
@@ -119,46 +127,53 @@ chain.push(check("SSE + NDJSON events normalize to delta/status/done", () => {
   assert.strictEqual(ev[1].text, "hi");
   assert.strictEqual(ev[2].text, " there");
   assert.strictEqual(O.normalizeEvent({ choices: [{ delta: { content: "tok" } }] }).text, "tok");
+  assert.strictEqual(O.normalizeEvent({ type: "output", text: "out" }).text, "out");
   assert.strictEqual(O.normalizeEvent({ type: "done" }).type, "done");
+  assert.strictEqual(O.sessionIdOf({ session_id: "sid" }), "sid");
 }));
 
-chain.push(check("createSession / message / goal / upload / stop send Bearer", async () => {
+chain.push(check("createSession / message / files / stop send Bearer — iOS door", async () => {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url: url, init: init });
-    if (url.endsWith("/api/occ/sessions") && init.method === "POST") {
-      return jsonRes(200, { ok: true, id: "sess_1", cwd: "/workspace" });
+    if (url.endsWith("/occ/sessions") && init.method === "POST") {
+      return jsonRes(200, { ok: true, session_id: "sess_1", cwd: "/workspace" });
     }
     if (url.indexOf("/messages") !== -1) return sseRes([{ type: "delta", text: "ok" }]);
-    if (url.indexOf("/goal") !== -1) return sseRes([{ type: "delta", text: "goal set" }]);
-    if (url.indexOf("/upload") !== -1) return jsonRes(200, { ok: true, name: "note.txt", path: "note.txt" });
+    if (url.indexOf("/files") !== -1) return jsonRes(200, { ok: true, name: "note.txt", path: "note.txt" });
     if (url.indexOf("/stop") !== -1) return jsonRes(200, { ok: true });
     return jsonRes(404, { error: "missing" });
   };
   const key = "oz_sub_live_key";
-  const sess = await O.createSession({ key: key, threadId: "t-1", fetchImpl: fetchImpl });
+  const sess = await O.createSession({ key: key, threadId: "t-1", name: "New chat", fetchImpl: fetchImpl });
   assert.strictEqual(sess.id, "sess_1");
+  const createBody = JSON.parse(calls[0].init.body);
+  assert.strictEqual(createBody.threadId, "t-1");
+  assert.strictEqual(createBody.name, "New chat");
   const deltas = [];
-  await O.postMessage("sess_1", "hello", {
+  await O.postMessage("sess_1", "/goal ship it", {
     key: key,
     fetchImpl: fetchImpl,
     onEvent: function (e) { if (e.text) deltas.push(e.text); },
   });
-  await O.postGoal("sess_1", "ship it", { key: key, fetchImpl: fetchImpl, onEvent: function () {} });
+  const msgBody = JSON.parse(calls[1].init.body);
+  assert.strictEqual(msgBody.text, "/goal ship it");
+  assert.strictEqual(msgBody.message, "/goal ship it");
+  assert.strictEqual(msgBody.stream, true);
   const up = await O.uploadFile("sess_1", { name: "note.txt", text: "hi" }, { key: key, fetchImpl: fetchImpl });
   await O.stopSession("sess_1", { key: key, fetchImpl: fetchImpl });
   assert.ok(up.ok);
   assert.ok(deltas.join("").indexOf("ok") !== -1);
-  assert.ok(calls.length >= 5);
+  assert.ok(calls.length >= 4);
   calls.forEach(function (c) {
     assert.match(c.init.headers.authorization, /^Bearer oz_sub_live_key$/);
     assert.doesNotMatch(JSON.stringify(c.init.headers), /ANTHROPIC_API_KEY/);
-    assert.match(c.url, /^https:\/\/zoo\.openzoo\.fun\/api\/occ\//);
+    assert.match(c.url, /^https:\/\/zoo\.openzoo\.fun\/occ\//);
+    assert.doesNotMatch(c.url, /\/api\/occ|\/goal$|\/upload$/);
   });
-  assert.ok(calls.some((c) => c.url.endsWith("/api/occ/sessions") && c.init.method === "POST"));
+  assert.ok(calls.some((c) => c.url.endsWith("/occ/sessions") && c.init.method === "POST"));
   assert.ok(calls.some((c) => /\/messages$/.test(c.url)));
-  assert.ok(calls.some((c) => /\/goal$/.test(c.url)));
-  assert.ok(calls.some((c) => /\/upload$/.test(c.url)));
+  assert.ok(calls.some((c) => /\/files$/.test(c.url)));
   assert.ok(calls.some((c) => /\/stop$/.test(c.url)));
 }));
 
@@ -186,7 +201,7 @@ chain.push(check("HTML 404/500 door is unavailable, not a fake local PTY", async
   } catch (e) {
     assert.strictEqual(e.name, "OccDoorUnavailableError");
     assert.match(e.message, /Chat still works/);
-    assert.doesNotMatch(e.message, /zoo\.openzoo\.fun|\/api\/occ|node-pty|:8402/);
+    assert.doesNotMatch(e.message, /zoo\.openzoo\.fun|\/occ\/sessions|node-pty|:8402/);
   }
   try {
     await O.createSession({
@@ -242,7 +257,9 @@ chain.push(check("Play IAP still entitles the key; store path is not x402", () =
   const readme = read("README.md");
   assert.match(shell, /play-paywall/);
   assert.match(billing, /exchangePlayPurchase/);
-  assert.match(handoff, /\/api\/occ\/sessions/);
+  assert.match(handoff, /\/occ\/sessions/);
+  assert.doesNotMatch(handoff, /\/api\/occ/);
+  assert.doesNotMatch(readme, /\/api\/occ/);
   assert.match(handoff, /Authorization: Bearer/);
   assert.match(readme, /hosted OCC/);
   assert.doesNotMatch(shell, /\/api\/billing\/checkout|checkout\.stripe\.com/);

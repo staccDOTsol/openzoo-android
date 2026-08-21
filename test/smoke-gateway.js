@@ -109,7 +109,7 @@ async function main() {
   }
   console.log("ok  POST /api/billing/play not a live mint (" + play.status + ") — Android stubs + TODO");
 
-  const occOpen = await fetch(billingOrigin + "/api/occ/sessions", {
+  const occOpen = await fetch(billingOrigin + "/occ/sessions", {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ threadId: "smoke" }),
@@ -120,7 +120,7 @@ async function main() {
   if (occOpen.ok && occJson && (occJson.id || occJson.sessionId)) {
     throw new Error("hosted OCC door must not mint a session without a Bearer: " + occRaw.slice(0, 200));
   }
-  console.log("ok  POST /api/occ/sessions is not an open OCC URL (" + occOpen.status + ")");
+  console.log("ok  POST /occ/sessions is not an open OCC URL (" + occOpen.status + ")");
 
   console.log("\n7 live gateway + billing + OCC-door checks passed");
 }

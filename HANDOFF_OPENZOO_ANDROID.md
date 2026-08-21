@@ -89,17 +89,20 @@ Every OCC call sends `Authorization: Bearer <subscription key>`.
 Door lives on `staccDOTsol/openzoo` / openzoo.fun. This app uses the same
 API origin it already uses for billing: **`https://zoo.openzoo.fun`**.
 
-These routes were **not live** when this client shipped (404 HTML, same
-class of gap as `POST /api/billing/play`). The Android client assumes:
+Same door as iOS PR `staccDOTsol/openzoo-ios#11`. Do not invent a second
+API. These routes were **not live** when this client shipped (HTML 404/500,
+same class of gap as `POST /api/billing/play`):
 
-| Method | Path | Body | Response |
-|---|---|---|---|
-| `POST` | `/api/occ/sessions` | `{ threadId, model? }` | `{ id, cwd?, status? }` |
-| `GET` | `/api/occ/sessions/:id` | — | `{ id, cwd?, status? }` |
-| `POST` | `/api/occ/sessions/:id/messages` | `{ text }` | SSE / NDJSON / JSON stream |
-| `POST` | `/api/occ/sessions/:id/goal` | `{ goal }` | SSE / NDJSON / JSON stream |
-| `POST` | `/api/occ/sessions/:id/upload` | multipart `file` + `relativePath` | `{ ok, name, path? }` |
-| `POST` | `/api/occ/sessions/:id/stop` | `{}` | `{ ok }` |
+| Method | Path | Body |
+|---|---|---|
+| `POST` | `/occ/sessions` | `{ threadId, name }` → `{ id }` or `{ session_id }` |
+| `GET` | `/occ/sessions/:id` | optional probe — not required |
+| `POST` | `/occ/sessions/:id/messages` | `{ text, message, stream: true }` — SSE. A goal slash is just a message string. |
+| `POST` | `/occ/sessions/:id/files` | multipart `file` or JSON `{ name, content, encoding: "base64" }` |
+| `POST` | `/occ/sessions/:id/stop` | interrupt |
+
+SSE events: `{ type: delta|text|output|status|pty|done|error }` and
+OpenAI-style `{ choices: [{ delta: { content } }] }`.
 
 Every row above: `Authorization: Bearer <OpenZoo subscription key>`.
 No key → the Agent chip stays locked and Chat still works. A 401/402/403
@@ -123,7 +126,7 @@ www/app/js/rails.js                 gateway + OCC origin + subscription Bearer k
 www/app/js/bind.js                  abstract attach → corpus (Chat)
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
-www/app/js/occ.js                   hosted OCC: session / message / goal / upload / stream
+www/app/js/occ.js                   hosted OCC: /occ/sessions + messages + files + stop
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
 cordova-plugin-play-billing/        BillingClient 6.2.1: query / purchase / restore / ack
 cordova-plugin-openzoo-clipboard/   Android ClipboardManager (not navigator.clipboard)
@@ -137,7 +140,7 @@ labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Chat / bind talk to `https://x402-tokens.fly.dev`. That hostname is the
 gateway, not an in-app x402 pay UI. Hosted Agent talks to
-`https://zoo.openzoo.fun/api/occ/*` with the Play subscription Bearer.
+`https://zoo.openzoo.fun/occ/*` with the Play subscription Bearer.
 
 Long threads use the same spill as `npx openzoo claude`: bind the transcript
 prefix to a per-thread context id, then POST system + last few turns with

@@ -463,7 +463,7 @@
     return O.createSession({
       key: currentKey(),
       threadId: t.id,
-      model: t.model || ($("model") && $("model").value) || "",
+      name: t.name || t.id,
     }).then(function (sess) {
       t.occSession = { id: sess.id };
       persist();
@@ -497,7 +497,7 @@
       thinking.textContent = "Subscribe with Google Play to use Agent.";
       return Promise.resolve();
     }
-    var goal = O.goalFromMessage(text);
+    var goal = O.goalFromMessage ? O.goalFromMessage(text) : null;
     if (goal === "") {
       thinking.textContent = "usage: /goal <job> — one slash. Agent keeps working until it's done.";
       t.messages.push({ role: "assistant", content: thinking.textContent });
@@ -510,10 +510,7 @@
       return ensureOccSession(t).then(function (sess) {
         var stream = paintOccStream(thinking);
         var opts = { key: currentKey(), onEvent: stream.onEvent };
-        var job = goal != null
-          ? O.postGoal(sess.id, goal, opts)
-          : O.postMessage(sess.id, text, opts);
-        return job.then(function () {
+        return O.postMessage(sess.id, text, opts).then(function () {
           if (goal != null) t.goalSet = true;
           var content = stream.text() || (goal != null ? "goal set." : "(no Agent output)");
           thinking.textContent = content;

@@ -6,15 +6,14 @@
  * Never ANTHROPIC_API_KEY. No key → no Agent.
  *
  * Origin matches this app's existing API origin (zoo.openzoo.fun),
- * same host as /api/billing/*. Assumed routes (door not live yet,
- * same situation as POST /api/billing/play):
+ * same host as /api/billing/* and iOS PR staccDOTsol/openzoo-ios#11.
+ * Same door — do not invent a second API.
  *
- *   POST /api/occ/sessions
- *   GET  /api/occ/sessions/:id
- *   POST /api/occ/sessions/:id/messages   (SSE / NDJSON / JSON)
- *   POST /api/occ/sessions/:id/goal
- *   POST /api/occ/sessions/:id/upload     (multipart file → session cwd)
- *   POST /api/occ/sessions/:id/stop
+ *   POST /occ/sessions
+ *   GET  /occ/sessions/:id                 (optional probe)
+ *   POST /occ/sessions/:id/messages        (SSE; a goal slash is a message)
+ *   POST /occ/sessions/:id/files           (multipart file or JSON base64)
+ *   POST /occ/sessions/:id/stop
  */
 (function (root, factory) {
   var api = factory();
@@ -27,8 +26,14 @@
   "use strict";
 
   var OCC_ORIGIN = "https://zoo.openzoo.fun";
-  var SESSIONS = "/api/occ/sessions";
+  var SESSIONS = "/occ/sessions";
   var PLACEHOLDER_KEYS = { openzoo: 1, "sk-openzoo": 1, "": 1 };
+  var OCC_PATHS = {
+    sessions: SESSIONS,
+    messages: function (id) { return sessionPath(id) + "/messages"; },
+    files: function (id) { return sessionPath(id) + "/files"; },
+    stop: function (id) { return sessionPath(id) + "/stop"; },
+  };
 
   function OccAuthError(message) {
     this.name = "OccAuthError";
@@ -97,8 +102,37 @@
     return headers;
   }
 
+  function sessionIdOf(data) {
+    if (!data || typeof data !== "object") return "";
+    return String(data.id || data.session_id || data.sessionId || data.occSessionId || "").trim();
+  }
+
   function sessionPath(id) {
     return SESSIONS + "/" + encodeURIComponent(String(id || ""));
+  }
+
+  function stripAnsi(s) {
+    return String(s || "")
+      .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
+      .replace(/\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g, "")
+      .replace(/\u001b./g, "");
+  }
+
+  function decodePty(data) {
+    var raw = String(data || "");
+    if (!raw) return "";
+    if (/^[A-Za-z0-9+/]+=*$/.test(raw.replace(/\s/g, "")) && raw.length % 4 === 0) {
+      try {
+        if (typeof Buffer !== "undefined") return Buffer.from(raw, "base64").toString("utf8");
+        if (typeof atob === "function") {
+          var bin = atob(raw);
+          var out = "";
+          for (var i = 0; i < bin.length; i++) out += String.fromCharCode(bin.charCodeAt(i));
+          return out;
+        }
+      } catch (e) { /* treat as plain */ }
+    }
+    return raw;
   }
 
   function sessionUrl(id) {
@@ -155,16 +189,22 @@
     if (type === "status" || type === "progress") {
       return { type: "status", text: String(json.text || json.message || json.status || "") };
     }
+    if (type === "pty") {
+      return { type: "delta", text: stripAnsi(decodePty(json.data || json.pty || json.text || "")) };
+    }
     var text = json.text;
+    if (text == null && json.output != null) text = json.output;
     if (text == null && json.delta != null) {
-      text = typeof json.delta === "string" ? json.delta : json.delta.text;
+      text = typeof json.delta === "string" ? json.delta : (json.delta.text || json.delta.content);
     }
     if (text == null) {
       var ch = json.choices && json.choices[0];
       if (ch && ch.delta && ch.delta.content != null) text = ch.delta.content;
       else if (ch && ch.message && ch.message.content != null) text = ch.message.content;
     }
+    if (text == null) text = json.content;
     if (text == null) text = "";
+    if (type === "output") return { type: "delta", text: String(text) };
     return { type: type === "text" ? "text" : "delta", text: String(text) };
   }
 
@@ -292,10 +332,10 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         threadId: opts.threadId || undefined,
-        model: opts.model || undefined,
+        name: opts.name || opts.threadId || undefined,
       }),
     }).then(function (body) {
-      var id = body.json && (body.json.id || body.json.sessionId);
+      var id = sessionIdOf(body.json);
       if (!id) throw new OccDoorUnavailableError();
       return {
         id: id,
@@ -312,7 +352,7 @@
       fetchImpl: opts.fetchImpl,
     }).then(function (body) {
       return {
-        id: (body.json && (body.json.id || body.json.sessionId)) || id,
+        id: sessionIdOf(body.json) || id,
         cwd: (body.json && body.json.cwd) || "",
         status: (body.json && body.json.status) || "ready",
       };
@@ -332,48 +372,42 @@
         "content-type": "application/json",
         accept: "text/event-stream, application/x-ndjson, application/json",
       },
-      body: JSON.stringify({ text: String(text || "") }),
+      body: JSON.stringify({
+        text: String(text || ""),
+        message: String(text || ""),
+        stream: true,
+      }),
     });
   }
 
-  function postGoal(id, goal, opts) {
-    opts = opts || {};
-    return occFetch(sessionPath(id) + "/goal", {
-      method: "POST",
-      key: opts.key,
-      fetchImpl: opts.fetchImpl,
-      stream: true,
-      onEvent: opts.onEvent,
-      signal: opts.signal,
-      headers: {
-        "content-type": "application/json",
-        accept: "text/event-stream, application/x-ndjson, application/json",
-      },
-      body: JSON.stringify({ goal: String(goal || "") }),
-    });
+  function toBase64(text) {
+    var s = String(text || "");
+    if (typeof Buffer !== "undefined") return Buffer.from(s, "utf8").toString("base64");
+    if (typeof btoa === "function") {
+      var bin = "";
+      for (var i = 0; i < s.length; i++) bin += String.fromCharCode(s.charCodeAt(i) & 0xff);
+      return btoa(bin);
+    }
+    return s;
   }
 
   function buildUploadBody(file) {
     file = file || {};
-    var name = file.name || "upload.bin";
-    var relativePath = file.relativePath || name;
-    if (typeof FormData !== "undefined") {
+    var name = file.name || "file";
+    if (typeof FormData !== "undefined" && (file.blob || file.file || typeof Blob !== "undefined")) {
       var fd = new FormData();
-      if (file.blob) fd.append("file", file.blob, name);
-      else if (typeof Blob !== "undefined") {
-        fd.append("file", new Blob([file.text || ""], { type: file.type || "text/plain" }), name);
-      } else {
-        fd.append("file", file.text || "");
-        fd.append("name", name);
-      }
-      fd.append("relativePath", relativePath);
+      var blob = file.blob || file.file;
+      if (blob) fd.append("file", blob, name);
+      else fd.append("file", new Blob([file.text || file.content || ""], { type: file.type || "text/plain" }), name);
+      fd.append("name", name);
       return { body: fd, multipart: true };
     }
+    var content = file.content != null ? file.content : toBase64(file.text || "");
     return {
       body: JSON.stringify({
         name: name,
-        text: file.text || "",
-        relativePath: relativePath,
+        content: content,
+        encoding: file.encoding || "base64",
       }),
       multipart: false,
     };
@@ -383,7 +417,7 @@
     opts = opts || {};
     var built = buildUploadBody(file);
     var extra = built.multipart ? {} : { "content-type": "application/json" };
-    return occFetch(sessionPath(id) + "/upload", {
+    return occFetch(sessionPath(id) + "/files", {
       method: "POST",
       key: opts.key,
       fetchImpl: opts.fetchImpl,
@@ -427,6 +461,8 @@
   return {
     OCC_ORIGIN: OCC_ORIGIN,
     SESSIONS: SESSIONS,
+    OCC_PATHS: OCC_PATHS,
+    sessionIdOf: sessionIdOf,
     OccAuthError: OccAuthError,
     OccDoorUnavailableError: OccDoorUnavailableError,
     asKey: asKey,
@@ -446,7 +482,6 @@
     createSession: createSession,
     getSession: getSession,
     postMessage: postMessage,
-    postGoal: postGoal,
     buildUploadBody: buildUploadBody,
     uploadFile: uploadFile,
     stopSession: stopSession,

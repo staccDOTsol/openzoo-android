@@ -31,7 +31,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 | Plans | Basic $9 · Pro $29 (Most teams want this) · Ultra $99 |
 | Play SKUs | `fun.openzoo.android.sub.basic` / `.pro` / `.ultra` |
 | Gateway | `https://x402-tokens.fly.dev` (chat / bind) |
-| Hosted OCC | `https://zoo.openzoo.fun/api/occ/*` (Agent; Bearer subscription key) |
+| Hosted OCC | `https://zoo.openzoo.fun/occ/*` (same door as iOS; Bearer subscription key) |
 
 ## How it works
 
@@ -46,7 +46,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 │  │  grokui threads + Chat / Agent │  │
 │  │  race dial · racing k/n back   │  │
 │  │  attach files/folder/text      │  │
-│  │  Agent: /goal + upload → cwd   │  │
+│  │  Agent: messages + files → cwd │  │
 │  │  Settings → plan / change plan │  │
 │  └────────────────────────────────┘  │
 └──────────────────────────────────────┘
@@ -64,18 +64,18 @@ subscription API key that web Stripe checkout already mints via
 Do not call `POST /api/billing/checkout` from Android.
 
 That minted key is also the hosted OCC Bearer. Agent never starts without
-it. Assumed door (same origin as billing; not live yet — 404 HTML, same
-gap as `/api/billing/play`):
+it. Same door as iOS (`staccDOTsol/openzoo-ios#11`). Assumed routes
+(same origin as billing; not live yet — same gap as `/api/billing/play`):
 
 ```
-POST /api/occ/sessions
-GET  /api/occ/sessions/:id
-POST /api/occ/sessions/:id/messages   # SSE / NDJSON / JSON
-POST /api/occ/sessions/:id/goal
-POST /api/occ/sessions/:id/upload     # multipart → session cwd
-POST /api/occ/sessions/:id/stop
+POST /occ/sessions                    { threadId, name } → { id } | { session_id }
+POST /occ/sessions/:id/messages       { text, message, stream: true }  # SSE
+POST /occ/sessions/:id/files          multipart file | { name, content, encoding: "base64" }
+POST /occ/sessions/:id/stop
 Authorization: Bearer <subscription key>
 ```
+
+A goal slash is a message string on `/messages`, not a separate route.
 
 Bind is **abstract**: the user attaches files, a folder, or pasted text.
 The UI never shows context ids, `/v1/bind`, or bind hashes. Chat history

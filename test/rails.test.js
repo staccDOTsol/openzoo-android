@@ -80,11 +80,13 @@ check("chat spill is Claude-CLI style: prefix bind + tail, never full+header", (
   assert.doesNotMatch(spill, /function spawn|PING:|childKickoff|worktree/);
 });
 
-check("hosted OCC is zoo.openzoo.fun /api/occ, not a local sidecar", () => {
+check("hosted OCC is zoo.openzoo.fun /occ, same door as iOS", () => {
   const occ = require("../www/app/js/occ.js");
   assert.strictEqual(occ.OCC_ORIGIN, R.OCC_ORIGIN);
   assert.strictEqual(occ.OCC_ORIGIN, "https://zoo.openzoo.fun");
-  assert.match(occ.SESSIONS, /^\/api\/occ\/sessions$/);
+  assert.strictEqual(occ.SESSIONS, "/occ/sessions");
+  assert.strictEqual(occ.OCC_PATHS.files("s1"), "/occ/sessions/s1/files");
+  assert.doesNotMatch(occ.SESSIONS, /\/api\/occ/);
   assert.ok(occ.isUsableKey("oz_sub_live_key"));
   assert.ok(!occ.isUsableKey("openzoo"));
 });
@@ -128,7 +130,7 @@ check("UI never shows context ids, /v1/bind, hashes, or wallet chrome", () => {
   assert.match(html, /id="modeAgent"/);
   assert.match(html, />Chat</);
   assert.match(html, />Agent</);
-  assert.doesNotMatch(html, /\/api\/occ|ANTHROPIC_API_KEY|node-pty/);
+  assert.doesNotMatch(html, /\/api\/occ|\/occ\/sessions\/:id\/goal|ANTHROPIC_API_KEY|node-pty/);
   assert.match(html, /#headerNewBtn\s*\{[\s\S]*?display:\s*inline-flex/);
   assert.doesNotMatch(html, /id="headerNewBtn"[^>]*class="dial"/);
   assert.doesNotMatch(html, /#headerNewBtn\s*\{\s*display:\s*none/);
