@@ -7,7 +7,7 @@ This is the same product as the desktop grokui client: **threads, chat**,
 **attach → bind behind the scenes**, a **race dial** (first X countable
 back of Y, default best 2 of 4 from a cheap / medium / expensive / grok4.6
 band), and **Agent** (cloud code-server + Cline — `POST`/`GET`
-`/ide/session` → `{ url, password?, id }`, load `url` full-bleed in
+`/api/ide/session` → `{ url, password?, id }`, load `url` full-bleed in
 `#agentFrame` / InAppBrowser, `viewport-fit=cover`, no nested scroll,
 no second composer on the IDE). Chat stays. Agent needs a Play subscription key
 (`Authorization: Bearer …`). No key → no Agent. Never
@@ -34,7 +34,7 @@ Capacitor, SwiftUI, or iOS deeplinks, and do not push to FreeSolDev.
 | Plans | Basic $9 · Pro $29 (Most teams want this) · Ultra $99 |
 | Play SKUs | `fun.openzoo.android.sub.basic` / `.pro` / `.ultra` |
 | Gateway | `https://x402-tokens.fly.dev` (chat / bind) |
-| Cloud IDE | `POST`/`GET` `https://zoo.openzoo.fun/ide/session` → `{ url, password?, id }` (Bearer subscription key) |
+| Cloud IDE | `POST`/`GET` `https://zoo.openzoo.fun/api/ide/session` → `{ url, password?, id }` (Bearer subscription key) |
 
 ## How it works
 
@@ -71,8 +71,8 @@ it. Assumed door (same origin as billing; not live yet — same gap as
 `/api/billing/play`):
 
 ```
-POST /ide/session                     { threadId, name } → { url, password?, id }
-GET  /ide/session                     resume → { url, password?, id }
+POST /api/ide/session                 { threadId, name } → { url, password?, id }
+GET  /api/ide/session                 resume → { url, password?, id }
 Authorization: Bearer <subscription key>
 ```
 

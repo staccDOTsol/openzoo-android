@@ -38,7 +38,7 @@ bind hashes.
 **Chat** stays completions + race + abstract bind on the gateway.
 
 **Agent** is cloud code-server + Cline (not hosted OCC, not local node-pty).
-`POST`/`GET` `/ide/session` with the Play subscription Bearer returns
+`POST`/`GET` `/api/ide/session` with the Play subscription Bearer returns
 `{ url, password?, id }`. Load `url` full-bleed in `#agentFrame` (or
 Cordova InAppBrowser on device). `viewport-fit=cover`. No nested scroll
 trapping. Do not overlay a second composer on the IDE. No subscription
@@ -86,11 +86,11 @@ Play Developer API and mint the **same** key Stripe already mints.
 Do not invent a second key system.
 
 That same Play-minted key is the **only** auth for Agent. Every
-`/ide/session` call sends `Authorization: Bearer <subscription key>`.
+`/api/ide/session` call sends `Authorization: Bearer <subscription key>`.
 Store Android stays **Play Billing / IAP only** — no x402, no MWA pay
 bypass. This change does not sideload or flash a build.
 
-## Cloud IDE door (`/ide/session`)
+## Cloud IDE door (`/api/ide/session`)
 
 Door lives on `staccDOTsol/openzoo` / openzoo.fun. This app uses the same
 API origin it already uses for billing: **`https://zoo.openzoo.fun`**.
@@ -101,8 +101,8 @@ class of gap as `POST /api/billing/play`):
 
 | Method | Path | Body |
 |---|---|---|
-| `POST` | `/ide/session` | optional `{ threadId, name }` → `{ url, password?, id }` |
-| `GET` | `/ide/session` | resume — same `{ url, password?, id }` (`?id=` if we already have one) |
+| `POST` | `/api/ide/session` | optional `{ threadId, name }` → `{ url, password?, id }` |
+| `GET` | `/api/ide/session` | resume — same `{ url, password?, id }` (`?id=` if we already have one) |
 
 Every row above: `Authorization: Bearer <OpenZoo subscription key>`.
 No key → the Agent chip stays locked and Chat still works. A 401/402/403
@@ -130,7 +130,7 @@ www/app/js/rails.js                 gateway + zoo origin + subscription Bearer k
 www/app/js/bind.js                  abstract attach → corpus (Chat)
 www/app/js/spill.js                 chat-history prefix bind + short tail (Claude CLI)
 www/app/js/race.js                  first-X-of-Y race (default 2 of 4) + cheap judge
-www/app/js/ide.js                   cloud code-server + Cline: POST/GET /ide/session
+www/app/js/ide.js                   cloud code-server + Cline: POST/GET /api/ide/session
 www/js/agent-host.js                full-bleed #agentFrame / InAppBrowser (no second composer)
 www/app/js/occ.js                   unused hosted OCC client (door may stay dark)
 www/app/js/pay.js                   subscription-key paidFetch (402 → restore Play)
@@ -146,7 +146,7 @@ labeled sidebar row — not a tiny `+` hidden in the drawer.
 
 Chat / bind talk to `https://x402-tokens.fly.dev`. That hostname is the
 gateway, not an in-app x402 pay UI. Agent talks to
-`https://zoo.openzoo.fun/ide/session` with the Play subscription Bearer,
+`https://zoo.openzoo.fun/api/ide/session` with the Play subscription Bearer,
 then loads the returned URL in the Agent webview.
 
 Long threads use the same spill as `npx openzoo claude`: bind the transcript

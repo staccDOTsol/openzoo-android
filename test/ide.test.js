@@ -46,10 +46,10 @@ function htmlRes(status) {
 
 const chain = [];
 
-chain.push(check("origin is this app's existing API host; door is /ide/session", () => {
+chain.push(check("origin is this app's existing API host; door is /api/ide/session", () => {
   assert.strictEqual(I.IDE_ORIGIN, "https://zoo.openzoo.fun");
   assert.strictEqual(I.IDE_ORIGIN, R.CONNECT_ORIGINS[0]);
-  assert.strictEqual(I.SESSION, "/ide/session");
+  assert.strictEqual(I.SESSION, "/api/ide/session");
   assert.doesNotMatch(I.SESSION, /\/occ\/|\/api\/occ|\/v1\/session/);
   assert.doesNotMatch(I.IDE_ORIGIN, /localhost|:8402|anthropic|claude\.ai/i);
 }));
@@ -106,14 +106,14 @@ chain.push(check("run mode: agent vs chat; no key defaults chat", () => {
   assert.ok(!I.isAgentMode({ runMode: "chat" }));
 }));
 
-chain.push(check("GET/POST /ide/session send Bearer and load only the returned url", async () => {
+chain.push(check("GET/POST /api/ide/session send Bearer and load only the returned url", async () => {
   const calls = [];
   const fetchImpl = async (url, init) => {
     calls.push({ url: url, init: init });
-    if (url.indexOf("/ide/session") !== -1 && (!init.method || init.method === "GET")) {
+    if (url.indexOf("/api/ide/session") !== -1 && (!init.method || init.method === "GET")) {
       return jsonRes(404, { error: "none" });
     }
-    if (url.endsWith("/ide/session") && init.method === "POST") {
+    if (url.endsWith("/api/ide/session") && init.method === "POST") {
       return jsonRes(200, {
         ok: true,
         id: "ide_1",
@@ -129,19 +129,19 @@ chain.push(check("GET/POST /ide/session send Bearer and load only the returned u
   assert.strictEqual(sess.url, "https://cs.openzoo.fun/?folder=/workspace");
   assert.strictEqual(sess.password, "s3cret");
   assert.match(I.frameSrc(sess), /cs\.openzoo\.fun/);
-  assert.ok(calls.some((c) => c.url === "https://zoo.openzoo.fun/ide/session" && (!c.init.method || c.init.method === "GET")));
-  assert.ok(calls.some((c) => c.url === "https://zoo.openzoo.fun/ide/session" && c.init.method === "POST"));
+  assert.ok(calls.some((c) => c.url === "https://zoo.openzoo.fun/api/ide/session" && (!c.init.method || c.init.method === "GET")));
+  assert.ok(calls.some((c) => c.url === "https://zoo.openzoo.fun/api/ide/session" && c.init.method === "POST"));
   calls.forEach(function (c) {
     assert.match(c.init.headers.authorization, /^Bearer oz_sub_live_key$/);
     assert.doesNotMatch(JSON.stringify(c.init.headers), /ANTHROPIC_API_KEY/);
-    assert.match(c.url, /^https:\/\/zoo\.openzoo\.fun\/ide\/session/);
+    assert.match(c.url, /^https:\/\/zoo\.openzoo\.fun\/api\/ide\/session/);
     assert.doesNotMatch(c.url, /\/occ\/|\/api\/occ|localhost|:8402/);
   });
   const got = await I.getSession({
     key: key,
     id: "ide_1",
     fetchImpl: async (url, init) => {
-      assert.match(url, /\/ide\/session\?id=ide_1$/);
+      assert.match(url, /\/api\/ide\/session\?id=ide_1$/);
       assert.strictEqual(init.method, "GET");
       return jsonRes(200, { url: "https://cs.openzoo.fun/s/ide_1", id: "ide_1" });
     },
@@ -212,7 +212,7 @@ chain.push(check("ensureSession treats 401 as subscribe and does not POST", asyn
   assert.deepStrictEqual(calls, ["GET"]);
 }));
 
-chain.push(check("shipped UI loads Agent webview from /ide/session; Chat unchanged", () => {
+chain.push(check("shipped UI loads Agent webview from /api/ide/session; Chat unchanged", () => {
   const html = read("www/app/index.html");
   const app = read("www/app/js/app.js");
   const ide = read("www/app/js/ide.js");
@@ -252,8 +252,8 @@ chain.push(check("Play IAP still entitles the key; store path is not x402 or MWA
   const cfg = read("config.xml");
   assert.match(shell, /play-paywall/);
   assert.match(billing, /exchangePlayPurchase/);
-  assert.match(handoff, /\/ide\/session/);
-  assert.match(readme, /\/ide\/session/);
+  assert.match(handoff, /\/api\/ide\/session/);
+  assert.match(readme, /\/api\/ide\/session/);
   assert.match(handoff, /code-server \+ Cline/);
   assert.match(readme, /code-server \+ Cline/);
   assert.match(handoff, /Authorization: Bearer/);

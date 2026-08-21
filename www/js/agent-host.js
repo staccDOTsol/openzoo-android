@@ -4,7 +4,7 @@
  * Prefers Cordova InAppBrowser (no nested WebView scroll).
  * Falls back to #agentFrame: position fixed, inset 0, viewport-fit=cover.
  * Never a second composer. Never Stripe / x402 / ANTHROPIC_API_KEY.
- * Only loads an https URL the caller already got from /ide/session.
+ * Only loads an https URL the caller already got from /api/ide/session.
  */
 (function (root, factory) {
   var api = factory(root);

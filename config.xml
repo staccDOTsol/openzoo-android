@@ -11,7 +11,7 @@
 
     <allow-navigation href="https://zoo.openzoo.fun/*" />
     <allow-navigation href="https://x402-tokens.fly.dev/*" />
-    <!-- Session URL comes from POST/GET /ide/session after Bearer auth. Never a hardcoded open IDE. -->
+    <!-- Session URL comes from POST/GET /api/ide/session after Bearer auth. Never a hardcoded open IDE. -->
     <allow-navigation href="https://*/*" />
     <access origin="https://zoo.openzoo.fun" />
     <access origin="https://x402-tokens.fly.dev" />

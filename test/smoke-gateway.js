@@ -128,7 +128,7 @@ async function main() {
   console.log("ok  POST /occ/sessions is not an open OCC URL (" + occOpen.status + ")");
 
   async function ideMustStayClosed(method) {
-    const ideOpen = await fetch(billingOrigin + "/ide/session", {
+    const ideOpen = await fetch(billingOrigin + "/api/ide/session", {
       method: method,
       headers: { "content-type": "application/json", accept: "application/json" },
       body: method === "GET" ? undefined : JSON.stringify({ threadId: "smoke" }),
@@ -137,9 +137,9 @@ async function main() {
     let ideJson = null;
     try { ideJson = JSON.parse(ideRaw); } catch (e) { ideJson = null; }
     if (ideOpen.ok && ideJson && ideJson.url) {
-      throw new Error(method + " /ide/session must not return a url without a Bearer: " + ideRaw.slice(0, 200));
+      throw new Error(method + " /api/ide/session must not return a url without a Bearer: " + ideRaw.slice(0, 200));
     }
-    console.log("ok  " + method + " /ide/session is not an open IDE URL (" + ideOpen.status + ")");
+    console.log("ok  " + method + " /api/ide/session is not an open IDE URL (" + ideOpen.status + ")");
   }
   await ideMustStayClosed("GET");
   await ideMustStayClosed("POST");

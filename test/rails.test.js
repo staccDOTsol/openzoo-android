@@ -80,13 +80,13 @@ check("chat spill is Claude-CLI style: prefix bind + tail, never full+header", (
   assert.doesNotMatch(spill, /function spawn|PING:|childKickoff|worktree/);
 });
 
-check("cloud Agent door is zoo.openzoo.fun /ide/session; OCC may stay unused", () => {
+check("cloud Agent door is zoo.openzoo.fun /api/ide/session; OCC may stay unused", () => {
   const ide = require("../www/app/js/ide.js");
   const occ = require("../www/app/js/occ.js");
   assert.strictEqual(ide.IDE_ORIGIN, R.OCC_ORIGIN);
   assert.strictEqual(ide.IDE_ORIGIN, "https://zoo.openzoo.fun");
-  assert.strictEqual(ide.SESSION, "/ide/session");
-  assert.strictEqual(R.IDE_SESSION, "/ide/session");
+  assert.strictEqual(ide.SESSION, "/api/ide/session");
+  assert.strictEqual(R.IDE_SESSION, "/api/ide/session");
   assert.doesNotMatch(ide.SESSION, /\/api\/occ|\/occ\//);
   assert.ok(ide.isUsableKey("oz_sub_live_key"));
   assert.ok(!ide.isUsableKey("openzoo"));

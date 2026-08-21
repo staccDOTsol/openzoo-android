@@ -222,7 +222,7 @@ chain.push(check("401/402 map to subscribe/restore, never x402", () => {
   assert.doesNotMatch(a.message + b.message, /x402|Phantom|wallet|Stripe/);
 }));
 
-chain.push(check("hosted OCC client may remain unused; Agent UI is /ide/session", () => {
+chain.push(check("hosted OCC client may remain unused; Agent UI is /api/ide/session", () => {
   const html = read("www/app/index.html");
   const app = read("www/app/js/app.js");
   const occ = read("www/app/js/occ.js");

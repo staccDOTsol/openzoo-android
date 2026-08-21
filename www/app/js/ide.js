@@ -8,8 +8,8 @@
  * Origin matches this app's existing API origin (zoo.openzoo.fun),
  * same host as /api/billing/*. Do not invent a second API.
  *
- *   POST /ide/session   → { url, password?, id }
- *   GET  /ide/session   → { url, password?, id }   (resume)
+ *   POST /api/ide/session   → { url, password?, id }
+ *   GET  /api/ide/session   → { url, password?, id }   (resume)
  *
  * Load `url` in the Agent webview. 401 → subscribe / restore Play.
  * Hosted OCC routes may remain in-tree unused.
@@ -25,7 +25,7 @@
   "use strict";
 
   var IDE_ORIGIN = "https://zoo.openzoo.fun";
-  var SESSION = "/ide/session";
+  var SESSION = "/api/ide/session";
   var PLACEHOLDER_KEYS = { openzoo: 1, "sk-openzoo": 1, "": 1 };
 
   function IdeAuthError(message) {
