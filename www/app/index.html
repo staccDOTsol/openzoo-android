@@ -51,6 +51,17 @@
   .dial.hot { color: #ececec; border-color: #5e5ce6; }
   #model.hidden-dial { display: none; }
   #tierSel, #raceSel { max-width: 108px; }
+  #modeToggle { display: flex; flex: 0 0 auto; border: 1px solid #2c2c2e; border-radius: 999px; overflow: hidden; }
+  .modebtn { background: #131315; color: #8e8e93; border: 0; font: inherit; font-size: 11px;
+             padding: 4px 10px; cursor: pointer; }
+  .modebtn.chat.on { background: #2c2c2e; color: #ececec; }
+  .modebtn.agent.on { background: #f28c4d; color: #1a0f08; }
+  #modeToggle.locked .modebtn.agent { opacity: .4; }
+  body.agent-mode #model, body.agent-mode #tierSel, body.agent-mode #raceSel { display: none; }
+  #goalTip { display: none; font-size: 11px; color: #8e8e93; padding: 0 4px 6px; }
+  body.agent-mode #goalTip { display: block; }
+  #agentStop { display: none; }
+  body.agent-mode #agentStop { display: inline-flex; }
   #headerNewBtn {
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
     background: #fff; color: #000; border: 0; border-radius: 999px;
@@ -153,6 +164,11 @@
       </div>
       <button type="button" id="headerNewBtn" data-component="new-chat">New chat</button>
       <div id="headerDials">
+        <div id="modeToggle" data-component="run-mode-toggle" role="group" aria-label="Chat or Agent mode">
+          <button class="modebtn chat on" id="modeChat" data-mode="chat" type="button">Chat</button>
+          <button class="modebtn agent" id="modeAgent" data-mode="agent" type="button">Agent</button>
+        </div>
+        <button class="dial" id="agentStop" type="button" title="Stop Agent">Stop</button>
         <input class="dial" id="model" list="modelList" placeholder="model" autocomplete="off">
         <datalist id="modelList"></datalist>
         <select class="dial" id="tierSel" data-component="model-tier" aria-label="Model band">
@@ -190,6 +206,7 @@
       <input id="fileInp" type="file" multiple style="position:absolute;width:1px;height:1px;opacity:0">
       <input id="folderInp" type="file" webkitdirectory multiple style="position:absolute;width:1px;height:1px;opacity:0">
       <div id="attachChips"></div>
+      <div id="goalTip">Pro tip: /goal &lt;job&gt; — one slash. Agent keeps working until it's done.</div>
       <div id="row-input">
         <div id="pill">
           <button class="icon-btn" id="plusBtn" type="button">
@@ -207,7 +224,7 @@
   <div id="settingsOverlay">
     <div class="sheet">
       <h3>Settings</h3>
-      <p class="wsub">Google Play subscription. Basic $9 / Pro $29 / Ultra $99.</p>
+      <p class="wsub">Google Play subscription. Basic $9 / Pro $29 / Ultra $99. Agent uses that same key.</p>
       <div id="planBody" class="wbal">loading plan…</div>
       <div class="actions">
         <button class="ghost" id="changePlanBtn" type="button">Change plan</button>
@@ -232,6 +249,7 @@
 <script src="js/bind.js"></script>
 <script src="js/spill.js"></script>
 <script src="js/race.js"></script>
+<script src="js/occ.js"></script>
 <script src="js/pay.js"></script>
 <script src="js/app.js"></script>
 </body>
